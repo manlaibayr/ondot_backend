@@ -14,3 +14,6 @@ export * from './chat-contact.model';
 export * from './chat-msg.model';
 export * from './like.model';
 export * from './note.model';
+export * from './ad.model';
+export * from './ad-history.model';
+export * from './rating.model';

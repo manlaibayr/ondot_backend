@@ -28,15 +28,14 @@ export class ChatController {
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const contactInfo = await this.chatContactRepository.findById(chatContactId);
-    if(currentUser.userId !== contactInfo.contactOtherUserId) throw new HttpErrors.BadRequest('요청이 승인되지 않았습니다.');
+    if(currentUser.userId !== contactInfo.contactOtherUserId && currentUser.userId !== contactInfo.contactUserId ) throw new HttpErrors.BadRequest('요청이 승인되지 않았습니다.');
     let newStatus: ContactStatus;
     if(type === 'allow') {
       newStatus = ContactStatus.ALLOW;
     } else if(type === 'reject') {
       newStatus = ContactStatus.REJECT
     } else if(type === 'delete') {
-      await this.chatMsgRepository.deleteAll({chatContactId});
-      await this.chatContactRepository.deleteById(chatContactId);
+      await this.chatContactRepository.updateById(chatContactId, {contactStatus: ContactStatus.DELETE});
       return;
     } else {
       return;
@@ -57,6 +56,8 @@ export class ChatController {
         return isSelf ? '신청중' : '승인대기중';
       } else if(status === ContactStatus.REJECT) {
         return isSelf ? '거부됨' : '거부함';
+      } else if(status === ContactStatus.DELETE) {
+        return '채팅종료';
       } else {
         return null;
       }

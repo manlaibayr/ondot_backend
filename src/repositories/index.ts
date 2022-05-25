@@ -14,3 +14,6 @@ export * from './chat-contact.repository';
 export * from './chat-msg.repository';
 export * from './like.repository';
 export * from './note.repository';
+export * from './ad-history.repository';
+export * from './ad.repository';
+export * from './rating.repository';

@@ -140,6 +140,7 @@ export class MeetingProfile extends Entity {
 
   @property({
     type: 'string',
+    default: '안녕하세요 동네 친구 구해요',
   })
   meetingOneLineIntro?: string;
 

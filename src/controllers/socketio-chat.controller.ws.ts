@@ -76,9 +76,9 @@ export class ChatControllerWs {
         this.socket.emit('SRV_PREVIOUS_CHAT_LIST', result);
 
         // 이전의 채팅모두 읽음으로 표시
-        await this.chatMsgRepository.updateAll({chatContactId: this.chatContactId, receiverUserId: this.meInfo.id, msgShow: true});
+        await this.chatMsgRepository.updateAll({msgShow: true}, {chatContactId: this.chatContactId, receiverUserId: this.meInfo.id});
       } catch (e) {
-        console.log(e);
+        console.error(e);
         // this.socket.disconnect();
       }
     } else {

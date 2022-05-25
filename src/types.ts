@@ -38,4 +38,10 @@ export enum ContactStatus {
   REQUEST = 'REQUEST',
   ALLOW = 'ALLOW',
   REJECT = 'REJECT',
+  DELETE = 'DELETE',
+}
+
+export enum AdType {
+  GOOGLE_AD = 'GOOGLE_AD',
+  LINK = 'LINK',
 }
