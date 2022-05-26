@@ -14,6 +14,16 @@ export class MeetingProfile extends Entity {
   userId: string;
 
   @property({
+    type: 'number',
+  })
+  age?: number;
+
+  @property({
+    type: 'string',
+  })
+  sex?: string;
+
+  @property({
     type: 'string',
   })
   meetingOtherSex?: string;

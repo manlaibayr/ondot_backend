@@ -12,6 +12,7 @@ export interface UserCredentials extends UserProfile{
   userId: string;
   username: string;
   userType: UserType;
+  userFlower: number;
   verifyToken: string
 }
 

@@ -26,7 +26,7 @@ export class MeetingController {
     @ws.namespace('main') nspMain: Namespace,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const userList = await this.meetingProfileRepository.find({include: [{relation: 'user'}]});
+    const userList = await this.meetingProfileRepository.find();
     const i = userList.findIndex((v) => v.userId === currentUser.userId);
     const myProfile = i !== -1 ? userList.splice(i, 1)[0] : null;
     const profileList: any = [];
@@ -37,8 +37,6 @@ export class MeetingController {
     userList.forEach((v) => {
       const info: any = v.toJSON();
       info.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
-      info.age = info.user.age;
-      delete info.user;
       profileList.push(info);
     });
 

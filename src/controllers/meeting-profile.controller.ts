@@ -40,11 +40,9 @@ export class MeetingProfileController {
   ){
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const likeCount = await this.likeRepository.count({likeOtherUserId: currentUser.userId});
-    const profile = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}, include: [{relation: 'user'}]});
+    const profile = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     if(!profile) throw new HttpErrors.BadRequest('미팅 프로파일을 설정해야 합니다.');
     const data: any = profile.toJSON();
-    data.age = data.user?.age;
-    delete data.user;
     data.likeCount = likeCount.count;
     return data;
   }
@@ -82,7 +80,10 @@ export class MeetingProfileController {
     if (profileInfo) {
       throw new HttpErrors.BadRequest('잘못된 요청입니다.');
     }
+    const userInfo = await this.userRepository.findById(currentUser.userId);
     meetingProfile.userId = currentUser.userId;
+    meetingProfile.age = userInfo.age;
+    meetingProfile.sex = userInfo.sex ? '남성' : '여성';
     const profileResult = await this.meetingProfileRepository.create(meetingProfile);
     await this.userRepository.updateById(currentUser.userId, {meetingProfileId: profileResult.id});
   }
@@ -101,7 +102,7 @@ export class MeetingProfileController {
         },
       },
     })
-      meetingProfile: MeetingProfile,
+      meetingProfile: Omit<MeetingProfile, 'id' | 'age' | 'sex'>,
   ): Promise<Count> {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     return this.meetingProfileRepository.updateAll(meetingProfile, {userId: currentUser.userId});
@@ -131,16 +132,14 @@ export class MeetingProfileController {
     @param.path.string('id') id: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const otherProfile = await this.meetingProfileRepository.findById(id, {include: [{relation: 'user'}]});
+    const otherProfile = await this.meetingProfileRepository.findById(id);
     const likeInfo = await this.likeRepository.findOne({where: {likeUserId: currentUser.userId, likeOtherUserId: otherProfile.userId, likeServiceType: ServiceType.MEETING}});
     const meetingChatList = await this.meetingChatListRepository.findOne(
       {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}]}}
     )
     const data: any = otherProfile.toJSON();
-    data.age = otherProfile.user.age;
     data.isLike = !!likeInfo;
     data.isChat = !!meetingChatList;
-    delete data.user;
     return data;
   }
 }

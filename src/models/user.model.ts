@@ -88,7 +88,7 @@ export class User extends Entity {
 
   @property({
     type: 'number',
-    default: 0,
+    default: 100,
   })
   userFlower: number;
 
