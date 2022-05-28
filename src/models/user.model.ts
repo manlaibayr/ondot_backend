@@ -1,6 +1,7 @@
-import {Entity, hasMany, model, property} from '@loopback/repository';
+import {Entity, hasMany, hasOne, model, property} from '@loopback/repository';
 import {Rolemapping} from './rolemapping.model';
 import {UserType, SignupType} from '../types';
+import {MeetingProfile} from './meeting-profile.model';
 
 @model()
 export class User extends Entity {
@@ -88,7 +89,7 @@ export class User extends Entity {
 
   @property({
     type: 'number',
-    default: 100,
+    default: 1000,
   })
   userFlower: number;
 
@@ -106,6 +107,9 @@ export class User extends Entity {
   @hasMany<Rolemapping>(() => Rolemapping, {keyTo: 'user_id'})
   rolemapping?: Rolemapping[];
 
+  @hasOne(() => MeetingProfile, {keyTo: 'userId'})
+  meetingProfile?: MeetingProfile;
+
   constructor(data?: Partial<User>) {
     super(data);
   }
@@ -114,6 +118,7 @@ export class User extends Entity {
 export interface UserRelations {
   // describe navigational properties here
   rolemapping?: Rolemapping[];
+  meetingProfile?: MeetingProfile;
 }
 
 export type UserWithRelations = User & UserRelations;

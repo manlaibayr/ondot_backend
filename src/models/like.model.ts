@@ -1,5 +1,6 @@
-import {Entity, model, property} from '@loopback/repository';
+import {belongsTo, Entity, model, property} from '@loopback/repository';
 import {ServiceType} from '../types';
+import {User, UserWithRelations} from './user.model';
 
 @model()
 export class Like extends Entity {
@@ -10,16 +11,10 @@ export class Like extends Entity {
   })
   id: string;
 
-  @property({
-    type: 'string',
-    required: true,
-  })
+  @belongsTo(() => User, {keyTo: 'likeUserId', name: 'likeUser'})
   likeUserId: string;
 
-  @property({
-    type: 'string',
-    required: true,
-  })
+  @belongsTo(() => User, {keyTo: 'likeOtherUserId', name: 'likeOtherUser'})
   likeOtherUserId: string;
 
   @property({
@@ -38,6 +33,7 @@ export class Like extends Entity {
   createdAt?: Date;
 
 
+
   constructor(data?: Partial<Like>) {
     super(data);
   }
@@ -45,6 +41,8 @@ export class Like extends Entity {
 
 export interface LikeRelations {
   // describe navigational properties here
+  likeUser?: UserWithRelations;
+  likeOtherUser?: UserWithRelations;
 }
 
 export type LikeWithRelations = Like & LikeRelations;

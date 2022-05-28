@@ -5,7 +5,7 @@ import {CONFIG} from '../config';
 import {repository} from '@loopback/repository';
 import {User, Verifytoken} from '../models';
 import {ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, UserRepository, VerifytokenRepository} from '../repositories';
-import {ContactStatus, UserType} from '../types';
+import {ChatMsgStatus, ContactStatus, UserType} from '../types';
 import {HttpErrors} from '@loopback/rest';
 
 const socketUserInfo: {[key: string]: any;} = {};
@@ -71,12 +71,13 @@ export class ChatControllerWs {
           meProfile: this.meInfo,
           otherProfile: this.otherInfo,
           waitAllowRequest: contactInfo.contactOtherUserId === user.id && contactInfo.contactStatus === ContactStatus.REQUEST,
+          otherDeleted: contactInfo.contactUserId === user.id ? (contactInfo.contactOtherStatus === ContactStatus.DELETE) : (contactInfo.contactStatus === ContactStatus.DELETE),
           previousChat
         }
         this.socket.emit('SRV_PREVIOUS_CHAT_LIST', result);
 
         // 이전의 채팅모두 읽음으로 표시
-        await this.chatMsgRepository.updateAll({msgShow: true}, {chatContactId: this.chatContactId, receiverUserId: this.meInfo.id});
+        await this.chatMsgRepository.updateAll({msgReceiverStatus: ChatMsgStatus.READ}, {chatContactId: this.chatContactId, receiverUserId: this.meInfo.id});
       } catch (e) {
         console.error(e);
         // this.socket.disconnect();
@@ -99,7 +100,8 @@ export class ChatControllerWs {
       receiverUserId: this.otherInfo.id,
       msgContent: chatMsg.content,
       msgType: chatMsg.type,
-      msgShow: this.socket.adapter.rooms[this.chatContactId].length > 1
+      msgSenderStatus: ChatMsgStatus.READ,
+      msgReceiverStatus: this.socket.adapter.rooms[this.chatContactId].length > 1 ? ChatMsgStatus.READ : ChatMsgStatus.UNREAD
     });
 
     if(this.socket.adapter.rooms[this.chatContactId].length < 2) {

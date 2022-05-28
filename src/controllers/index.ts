@@ -14,3 +14,4 @@ export * from './note.controller';
 export * from './notification.controller';
 export * from './ad.controller';
 export * from './rating.controller';
+export * from './visit.controller';

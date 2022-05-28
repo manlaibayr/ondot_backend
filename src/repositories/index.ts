@@ -17,3 +17,4 @@ export * from './note.repository';
 export * from './ad-history.repository';
 export * from './ad.repository';
 export * from './rating.repository';
+export * from './visit.repository';

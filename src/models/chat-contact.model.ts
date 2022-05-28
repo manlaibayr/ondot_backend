@@ -35,6 +35,15 @@ export class ChatContact extends Entity {
     type: 'string',
     required: true,
     jsonSchema: {
+      enum: Object.values(ContactStatus),
+    },
+  })
+  contactOtherStatus: ContactStatus;
+
+  @property({
+    type: 'string',
+    required: true,
+    jsonSchema: {
       enum: Object.values(ServiceType),
     },
   })

@@ -88,6 +88,7 @@ export class MeetingController {
         contactUserId: currentUser.userId,
         contactOtherUserId: userId,
         contactStatus: ContactStatus.REQUEST,
+        contactOtherStatus: ContactStatus.REQUESTED,
         contactServiceType: ServiceType.MEETING
       });
     }

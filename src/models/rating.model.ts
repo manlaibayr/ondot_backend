@@ -29,25 +29,10 @@ export class Rating extends Entity {
   ratingValue: number;
 
   @property({
-    type: 'string'
-  })
-  ratingText?: string;
-
-  @property({
-    type: 'string',
-    required: true,
-    jsonSchema: {
-      enum: Object.values(ServiceType)
-    }
-  })
-  ratingServiceType: ServiceType;
-
-  @property({
     type: 'date',
     default: "$now"
   })
   createdAt: Date;
-
 
   constructor(data?: Partial<Rating>) {
     super(data);

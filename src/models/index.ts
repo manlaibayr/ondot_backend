@@ -17,3 +17,4 @@ export * from './note.model';
 export * from './ad.model';
 export * from './ad-history.model';
 export * from './rating.model';
+export * from './visit.model';

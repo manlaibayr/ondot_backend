@@ -7,7 +7,7 @@ import moment from 'moment';
 import {FILE_UPLOAD_SERVICE} from '../keys';
 import {FileUploadHandler, ServiceType, UserCredentials} from '../types';
 import {MeetingProfile} from '../models';
-import {LikeRepository, ChatContactRepository, MeetingProfileRepository, UserRepository} from '../repositories';
+import {ChatContactRepository, LikeRepository, MeetingProfileRepository, RatingRepository, UserRepository, VisitRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
 import {Utils} from '../utils';
 
@@ -17,6 +17,8 @@ export class MeetingProfileController {
     @repository(UserRepository) public userRepository: UserRepository,
     @repository(LikeRepository) public likeRepository : LikeRepository,
     @repository(ChatContactRepository) public meetingChatListRepository: ChatContactRepository,
+    @repository(RatingRepository) public ratingRepository: RatingRepository,
+    @repository(VisitRepository) public visitRepository: VisitRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
@@ -137,9 +139,17 @@ export class MeetingProfileController {
     const meetingChatList = await this.meetingChatListRepository.findOne(
       {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}]}}
     )
+    const ratingCount = await this.ratingRepository.count({ratingUserId: currentUser.userId, ratingOtherUserId: otherProfile.userId});
     const data: any = otherProfile.toJSON();
     data.isLike = !!likeInfo;
     data.isChat = !!meetingChatList;
+    data.isGiveRating = ratingCount.count > 0;
+    const visitInfo = await this.visitRepository.findOne({where: {visitUserId: currentUser.userId, visitOtherUserId: otherProfile.userId, visitServiceType: ServiceType.MEETING}});
+    if(visitInfo) {
+      await this.visitRepository.updateById(visitInfo.id, {visitLastTime: new Date()});
+    } else {
+      await this.visitRepository.create({visitUserId: currentUser.userId, visitOtherUserId: otherProfile.userId, visitServiceType: ServiceType.MEETING, visitLastTime: new Date()});
+    }
     return data;
   }
 }

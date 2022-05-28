@@ -1,4 +1,5 @@
 import {Entity, model, property} from '@loopback/repository';
+import {ChatMsgStatus} from '../types';
 
 @model({settings: {mysql: {table: 'chat_msg'}}})
 export class ChatMsg extends Entity {
@@ -39,11 +40,22 @@ export class ChatMsg extends Entity {
   msgType: string;
 
   @property({
-    type: 'boolean',
+    type: 'string',
     required: true,
-    default: false,
+    jsonSchema: {
+      enum: Object.values(ChatMsgStatus),
+    },
   })
-  msgShow: boolean;
+  msgSenderStatus: ChatMsgStatus;
+
+  @property({
+    type: 'string',
+    required: true,
+    jsonSchema: {
+      enum: Object.values(ChatMsgStatus),
+    },
+  })
+  msgReceiverStatus: ChatMsgStatus;
 
   @property({
     type: 'date',
