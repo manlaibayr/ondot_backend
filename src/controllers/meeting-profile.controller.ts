@@ -42,10 +42,12 @@ export class MeetingProfileController {
   ){
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const likeCount = await this.likeRepository.count({likeOtherUserId: currentUser.userId});
+    const visitCount = await this.visitRepository.count({visitOtherUserId: currentUser.userId, visitLastTime: {gte: moment().startOf('day').toDate()}});
     const profile = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     if(!profile) throw new HttpErrors.BadRequest('미팅 프로파일을 설정해야 합니다.');
     const data: any = profile.toJSON();
     data.likeCount = likeCount.count;
+    data.visitCount = visitCount.count;
     return data;
   }
 
@@ -110,9 +112,9 @@ export class MeetingProfileController {
     return this.meetingProfileRepository.updateAll(meetingProfile, {userId: currentUser.userId});
   }
 
-  @post('/meeting-profiles/upload-img')
+  @post('/meeting-profiles/upload-file')
   @secured(SecuredType.IS_AUTHENTICATED)
-  async uploadImage(
+  async uploadFile(
     @requestBody.file() request: Request,
     @inject(RestBindings.Http.RESPONSE) resp: Response,
   ) {

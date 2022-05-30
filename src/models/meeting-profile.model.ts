@@ -155,6 +155,11 @@ export class MeetingProfile extends Entity {
   meetingOneLineIntro?: string;
 
   @property({
+    type: 'string',
+  })
+  meetingVoice?: string;
+
+  @property({
     type: 'date',
     default: "$now"
   })

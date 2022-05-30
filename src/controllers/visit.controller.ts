@@ -42,6 +42,7 @@ export class VisitController {
     const visit = visitList.map((v) => ({
       isOnline: onlineUserIds.indexOf(v.visitUserId) !== -1,
       userId: v.visitUser?.id,
+      visitLastTime: v.visitLastTime,
       meetingProfileId: v.visitUser?.meetingProfileId,
       profile: v.visitUser?.meetingProfile?.meetingPhotoMain,
       meetingNickname: v.visitUser?.meetingProfile?.meetingNickname,
