@@ -18,3 +18,6 @@ export * from './ad-history.repository';
 export * from './ad.repository';
 export * from './rating.repository';
 export * from './visit.repository';
+export * from './block-phone.repository';
+export * from './block-user.repository';
+export * from './report.repository';

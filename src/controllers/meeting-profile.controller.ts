@@ -7,7 +7,17 @@ import moment from 'moment';
 import {FILE_UPLOAD_SERVICE} from '../keys';
 import {FileUploadHandler, ServiceType, UserCredentials} from '../types';
 import {MeetingProfile} from '../models';
-import {ChatContactRepository, LikeRepository, MeetingProfileRepository, RatingRepository, UserRepository, VisitRepository} from '../repositories';
+import {
+  BlockPhoneRepository,
+  BlockUserRepository,
+  ChatContactRepository,
+  FlowerHistoryRepository,
+  LikeRepository,
+  MeetingProfileRepository,
+  RatingRepository,
+  UserRepository,
+  VisitRepository,
+} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
 import {Utils} from '../utils';
 
@@ -19,6 +29,9 @@ export class MeetingProfileController {
     @repository(ChatContactRepository) public meetingChatListRepository: ChatContactRepository,
     @repository(RatingRepository) public ratingRepository: RatingRepository,
     @repository(VisitRepository) public visitRepository: VisitRepository,
+    @repository(BlockUserRepository) public blockUserRepository: BlockUserRepository,
+    @repository(BlockPhoneRepository) public blockPhoneRepository: BlockPhoneRepository,
+    @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
@@ -88,8 +101,17 @@ export class MeetingProfileController {
     meetingProfile.userId = currentUser.userId;
     meetingProfile.age = userInfo.age;
     meetingProfile.sex = userInfo.sex ? '남성' : '여성';
+    let userFlower = userInfo.userFlower;
+    if(meetingProfile.meetingPhotoAdditional && meetingProfile.meetingPhotoAdditional.split(',').length >= 4) {
+      await this.flowerHistoryRepository.create({
+        flowerUserId: currentUser.userId,
+        flowerContent: '미팅프로필 등록시 사진 4장을 추가하여 받음',
+        flowerValue: 20,
+      });
+      userFlower += 20;
+    }
     const profileResult = await this.meetingProfileRepository.create(meetingProfile);
-    await this.userRepository.updateById(currentUser.userId, {meetingProfileId: profileResult.id});
+    await this.userRepository.updateById(currentUser.userId, {meetingProfileId: profileResult.id, userFlower});
   }
 
   @patch('/meeting-profiles')
@@ -142,10 +164,12 @@ export class MeetingProfileController {
       {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}]}}
     )
     const ratingCount = await this.ratingRepository.count({ratingUserId: currentUser.userId, ratingOtherUserId: otherProfile.userId});
+    const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: otherProfile.userId, blockServiceType: ServiceType.MEETING}});
     const data: any = otherProfile.toJSON();
     data.isLike = !!likeInfo;
     data.isChat = !!meetingChatList;
     data.isGiveRating = ratingCount.count > 0;
+    data.isBlock = !!blockInfo;
     const visitInfo = await this.visitRepository.findOne({where: {visitUserId: currentUser.userId, visitOtherUserId: otherProfile.userId, visitServiceType: ServiceType.MEETING}});
     if(visitInfo) {
       await this.visitRepository.updateById(visitInfo.id, {visitLastTime: new Date()});

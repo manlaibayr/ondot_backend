@@ -54,3 +54,11 @@ export enum AdType {
   GOOGLE_AD = 'GOOGLE_AD',
   LINK = 'LINK',
 }
+
+export enum ReportType {
+  TYPE1 = 'TYPE1',  // 광고 등 부적절한 목적의 이용
+  TYPE2 = 'TYPE2',  // 개인정보 기재
+  TYPE3 = 'TYPE3',  // 욕설이나 비방
+  TYPE4 = 'TYPE4',  // 부정적인 음성메세지
+  OTHER = 'OTHER'   // 기타
+}

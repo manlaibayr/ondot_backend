@@ -4,8 +4,8 @@ import {ws} from '../websockets/decorators/websocket.decorator';
 import {CONFIG} from '../config';
 import {repository} from '@loopback/repository';
 import {User, Verifytoken} from '../models';
-import {ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, UserRepository, VerifytokenRepository} from '../repositories';
-import {ChatMsgStatus, ContactStatus, UserType} from '../types';
+import {BlockUserRepository, ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, UserRepository, VerifytokenRepository} from '../repositories';
+import {ChatMsgStatus, ContactStatus, ServiceType, UserType} from '../types';
 import {HttpErrors} from '@loopback/rest';
 
 const socketUserInfo: {[key: string]: any;} = {};
@@ -18,7 +18,8 @@ const socketUserInfo: {[key: string]: any;} = {};
 export class ChatControllerWs {
   private chatContactId: string;  // same with live id
   private meInfo: {id: string, nickname?: string, profile?: string};
-  private otherInfo: {id: string, nickname?: string, profile?: string};
+  private otherInfo: {id: string, nickname?: string, profile?: string, isBlock?: boolean};
+  private otherDeleted: boolean;
 
   constructor(
     @ws.socket() private socket: Socket, // Equivalent to `@inject('ws.socket')`
@@ -27,7 +28,28 @@ export class ChatControllerWs {
     @repository(ChatContactRepository) private chatContactRepository: ChatContactRepository,
     @repository(ChatMsgRepository) private chatMsgRepository: ChatMsgRepository,
     @repository(MeetingProfileRepository) private meetingProfileRepository: MeetingProfileRepository,
+    @repository(BlockUserRepository) private blockUserRepository: BlockUserRepository,
   ) {
+  }
+
+  async getContactInfo(userId: string) {
+    const contactInfo = await this.chatContactRepository.findById(this.chatContactId);
+    const otherUserId = contactInfo.contactUserId === userId ? contactInfo.contactOtherUserId : contactInfo.contactUserId;
+    const [meProfile, otherProfile] = await Promise.all([
+      this.meetingProfileRepository.findOne({where: {userId: userId}}),
+      this.meetingProfileRepository.findOne({where: {userId: otherUserId}}),
+    ]);
+    if(!meProfile || !otherProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
+    const otherBlock = await this.blockUserRepository.findOne({where: {blockUserId: userId, blockOtherUserId: otherUserId, blockServiceType: ServiceType.MEETING}});
+    const meBlock = await this.blockUserRepository.findOne({where: {blockUserId: otherUserId, blockOtherUserId: userId, blockServiceType: ServiceType.MEETING}});
+    const meInfo = {id: meProfile.userId, profile: meProfile.meetingPhotoMain, nickname: meProfile.meetingNickname};
+    const otherInfo = {id: otherProfile?.userId, profile: otherProfile?.meetingPhotoMain, nickname: otherProfile?.meetingNickname, isBlock: !!otherBlock}
+    return {
+      meProfile: meInfo,
+      otherProfile: otherInfo,
+      waitAllowRequest: contactInfo.contactOtherUserId === userId && contactInfo.contactStatus === ContactStatus.REQUEST,
+      otherDeleted: !!meBlock || (contactInfo.contactUserId === userId ? (contactInfo.contactOtherStatus === ContactStatus.DELETE) : (contactInfo.contactStatus === ContactStatus.DELETE)),
+    }
   }
 
   /**
@@ -57,21 +79,13 @@ export class ChatControllerWs {
         // send previous message and info;
         this.chatContactId = this.socket.client.request.headers.chatcontactid;
         this.socket.join(this.chatContactId);
-        const contactInfo = await this.chatContactRepository.findById(this.chatContactId);
-        const otherUserId = contactInfo.contactUserId === user?.id ? contactInfo.contactOtherUserId : contactInfo.contactUserId;
-        const [meProfile, otherProfile] = await Promise.all([
-          this.meetingProfileRepository.findOne({where: {userId: user.id}}),
-          this.meetingProfileRepository.findOne({where: {userId: otherUserId}}),
-        ]);
-        if(!meProfile || !otherProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
-        this.meInfo = {id: meProfile.userId, profile: meProfile.meetingPhotoMain, nickname: meProfile.meetingNickname};
-        this.otherInfo = {id: otherProfile?.userId, profile: otherProfile?.meetingPhotoMain, nickname: otherProfile?.meetingNickname}
+        const contactInfo = await this.getContactInfo(user.id);
         const previousChat = await this.chatMsgRepository.find({where: {chatContactId: this.chatContactId}});
+        this.meInfo = contactInfo.meProfile;
+        this.otherInfo = contactInfo.otherProfile;
+        this.otherDeleted = contactInfo.otherDeleted;
         const result = {
-          meProfile: this.meInfo,
-          otherProfile: this.otherInfo,
-          waitAllowRequest: contactInfo.contactOtherUserId === user.id && contactInfo.contactStatus === ContactStatus.REQUEST,
-          otherDeleted: contactInfo.contactUserId === user.id ? (contactInfo.contactOtherStatus === ContactStatus.DELETE) : (contactInfo.contactStatus === ContactStatus.DELETE),
+          ...contactInfo,
           previousChat
         }
         this.socket.emit('SRV_PREVIOUS_CHAT_LIST', result);
@@ -88,6 +102,19 @@ export class ChatControllerWs {
     }
   }
 
+  @ws.subscribe('CLIENT_CONTACT_INFO')
+  async getOtherInfo(
+    chatMsg: any,
+    @ws.namespace('main') nspMain: Namespace,
+  ) {
+    const contactInfo = await this.getContactInfo(this.meInfo.id);
+    this.meInfo = contactInfo.meProfile;
+    this.otherInfo = contactInfo.otherProfile;
+    this.otherDeleted = contactInfo.otherDeleted;
+    this.socket.emit('SRV_CONTACT_INFO', contactInfo);
+    const otherContactInfo = await this.getContactInfo(this.otherInfo.id);
+    this.socket.to(this.chatContactId).emit('SRV_CONTACT_INFO', otherContactInfo);
+  }
 
   @ws.subscribe('CLIENT_SEND_MSG')
   async sendChatMsg(
@@ -104,12 +131,16 @@ export class ChatControllerWs {
       msgReceiverStatus: this.socket.adapter.rooms[this.chatContactId].length > 1 ? ChatMsgStatus.READ : ChatMsgStatus.UNREAD
     });
 
-    if(this.socket.adapter.rooms[this.chatContactId].length < 2) {
-      nspMain.to(this.otherInfo.id).emit('SRV_OTHER_USER_CHAT',
-        {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile}
-      );
+    //차단정보
+    const blockUserInfo = await this.blockUserRepository.findOne({where: {blockUserId: this.otherInfo.id, blockOtherUserId: this.meInfo.id}});
+    if(!this.otherDeleted && !blockUserInfo) {
+      if(this.socket.adapter.rooms[this.chatContactId].length < 2) {
+        nspMain.to(this.otherInfo.id).emit('SRV_OTHER_USER_CHAT',
+          {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile}
+        );
+      }
+      this.socket.to(this.chatContactId).emit('SRV_RECEIVE_MSG', chatInfo);
     }
-    this.socket.to(this.chatContactId).emit('SRV_RECEIVE_MSG', chatInfo);
   }
 
 

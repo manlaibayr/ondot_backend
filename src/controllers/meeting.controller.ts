@@ -4,7 +4,7 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
-import {ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
+import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
 import {ContactStatus, ServiceType, UserCredentials} from '../types';
 import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
@@ -16,6 +16,7 @@ export class MeetingController {
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
+    @repository(BlockPhoneRepository) public blockPhoneRepository: BlockPhoneRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
@@ -26,14 +27,16 @@ export class MeetingController {
     @ws.namespace('main') nspMain: Namespace,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const userList = await this.meetingProfileRepository.find();
+    // 지인차단
+    const blockPhones = await this.blockPhoneRepository.find({where: {blockPhoneUserId: currentUser.userId}});
+    const blockUsers = await this.userRepository.find({where: {phoneNumber: {inq: blockPhones.map((v) => v.blockPhoneNum)}}});
+    const userList = await this.meetingProfileRepository.find({where: {userId: {nin: blockUsers.map((v) => v.id)}}});
     const i = userList.findIndex((v) => v.userId === currentUser.userId);
     const myProfile = i !== -1 ? userList.splice(i, 1)[0] : null;
     const profileList: any = [];
     // 접속한 회원 리스트
     const rooms: any = nspMain.adapter.rooms;
     const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
-
     userList.forEach((v) => {
       const info: any = v.toJSON();
       info.isOnline = onlineUserIds.indexOf(v.userId) !== -1;

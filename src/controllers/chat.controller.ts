@@ -24,11 +24,13 @@ export class ChatController {
   @secured(SecuredType.IS_AUTHENTICATED)
   async allowChat(
     @ws.namespace('main') nspMain: Server,
+    @ws.namespace('chat') nspChat: Server,
     @param.query.string('chatContactId') chatContactId: string,
     @param.query.string('type') type: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const contactInfo = await this.chatContactRepository.findById(chatContactId);
+    const otherUserId = contactInfo.contactUserId === currentUser.userId ? contactInfo.contactOtherUserId : contactInfo.contactUserId;
     if (currentUser.userId !== contactInfo.contactOtherUserId && currentUser.userId !== contactInfo.contactUserId) throw new HttpErrors.BadRequest('요청이 승인되지 않았습니다.');
     if (type === 'allow') {
       await this.chatContactRepository.updateById(chatContactId, {contactStatus: ContactStatus.ALLOW, contactOtherStatus: ContactStatus.ALLOW});
@@ -44,10 +46,11 @@ export class ChatController {
       });
       await this.chatMsgRepository.updateAll({msgSenderStatus: ChatMsgStatus.DELETE}, {chatContactId, senderUserId: currentUser.userId});
       await this.chatMsgRepository.updateAll({msgReceiverStatus: ChatMsgStatus.DELETE}, {chatContactId, receiverUserId: currentUser.userId});
+      nspChat.to(chatContactId).emit('SRV_CONTACT_CHANGE', {});
     } else {
       return;
     }
-    // nspMain.to(contactInfo.contactOtherUserId).emit('SRV_CONTACT_CHANGE', {chatContactId: chatContactId, status: type});
+    nspMain.to(otherUserId).emit('SRV_CHANGE_CONTACT_LIST', {});
   }
 
   @get('/chats/contact-list')
@@ -61,7 +64,12 @@ export class ChatController {
     });
     const getStatusStr = (isSelf: boolean, info: ChatContact) => {
       const status: ContactStatus = isSelf ? info.contactStatus : info.contactOtherStatus;
-      return status === ContactStatus.ALLOW ? null : status;
+      const otherUserStatus: ContactStatus = !isSelf ? info.contactStatus : info.contactOtherStatus;
+      if(status === ContactStatus.ALLOW) {
+        return otherUserStatus === ContactStatus.DELETE ? '채팅종료' : null
+      } else {
+        return status;
+      }
     };
 
     const contactList = contactListResult.map((v) => ({
@@ -78,11 +86,12 @@ export class ChatController {
     for (const v of contactList) {
       const findObj = meetingProfileList.find((p) => p.userId === v.otherUserId);
       const unReadCount = await this.chatMsgRepository.count({chatContactId: v.id, receiverUserId: currentUser.userId, msgReceiverStatus: ChatMsgStatus.UNREAD});
+      const lastChat = await this.chatMsgRepository.findOne({where: {chatContactId: v.id}, order: ['createdAt desc']});
       result.push({
         ...v,
         nickname: findObj?.meetingNickname,
         profile: findObj?.meetingPhotoMain,
-        lastMsg: '안녕하세요 대화 가능하신가요?',
+        lastMsg: lastChat?.msgContent,
         unreadCount: unReadCount.count,
         isOnline: onlineUserIds.indexOf(v.otherUserId) !== -1,
       });

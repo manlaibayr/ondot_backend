@@ -18,3 +18,6 @@ export * from './ad.model';
 export * from './ad-history.model';
 export * from './rating.model';
 export * from './visit.model';
+export * from './report.model';
+export * from './block-user.model';
+export * from './block-phone.model';

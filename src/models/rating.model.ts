@@ -1,5 +1,4 @@
 import {Entity, model, property} from '@loopback/repository';
-import {ServiceType} from '../types';
 
 @model()
 export class Rating extends Entity {

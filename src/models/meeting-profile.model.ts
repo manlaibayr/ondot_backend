@@ -160,6 +160,11 @@ export class MeetingProfile extends Entity {
   meetingVoice?: string;
 
   @property({
+    type: 'string',
+  })
+  meetingBackground?: string;
+
+  @property({
     type: 'date',
     default: "$now"
   })
