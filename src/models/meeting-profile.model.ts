@@ -59,6 +59,12 @@ export class MeetingProfile extends Entity {
   meetingJob?: string;
 
   @property({
+    type: 'boolean',
+    default: false,
+  })
+  meetingJobHide?: boolean;
+
+  @property({
     type: 'string',
   })
   meetingEducation?: string;

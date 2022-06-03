@@ -5,7 +5,7 @@ import {CONFIG} from '../config';
 import {repository} from '@loopback/repository';
 import {User, Verifytoken} from '../models';
 import {BlockUserRepository, ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, UserRepository, VerifytokenRepository} from '../repositories';
-import {ChatMsgStatus, ContactStatus, ServiceType, UserType} from '../types';
+import {ChatMsgStatus, ChatSocketMsgType, ContactStatus, MainSocketMsgType, ServiceType, UserType} from '../types';
 import {HttpErrors} from '@loopback/rest';
 
 const socketUserInfo: {[key: string]: any;} = {};
@@ -88,7 +88,7 @@ export class ChatControllerWs {
           ...contactInfo,
           previousChat
         }
-        this.socket.emit('SRV_PREVIOUS_CHAT_LIST', result);
+        this.socket.emit(ChatSocketMsgType.SRV_PREVIOUS_CHAT_LIST, result);
 
         // 이전의 채팅모두 읽음으로 표시
         await this.chatMsgRepository.updateAll({msgReceiverStatus: ChatMsgStatus.READ}, {chatContactId: this.chatContactId, receiverUserId: this.meInfo.id});
@@ -111,9 +111,9 @@ export class ChatControllerWs {
     this.meInfo = contactInfo.meProfile;
     this.otherInfo = contactInfo.otherProfile;
     this.otherDeleted = contactInfo.otherDeleted;
-    this.socket.emit('SRV_CONTACT_INFO', contactInfo);
+    this.socket.emit(ChatSocketMsgType.SRV_CONTACT_INFO, contactInfo);
     const otherContactInfo = await this.getContactInfo(this.otherInfo.id);
-    this.socket.to(this.chatContactId).emit('SRV_CONTACT_INFO', otherContactInfo);
+    this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_CONTACT_INFO, otherContactInfo);
   }
 
   @ws.subscribe('CLIENT_SEND_MSG')
@@ -135,11 +135,11 @@ export class ChatControllerWs {
     const blockUserInfo = await this.blockUserRepository.findOne({where: {blockUserId: this.otherInfo.id, blockOtherUserId: this.meInfo.id}});
     if(!this.otherDeleted && !blockUserInfo) {
       if(this.socket.adapter.rooms[this.chatContactId].length < 2) {
-        nspMain.to(this.otherInfo.id).emit('SRV_OTHER_USER_CHAT',
+        nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_USER_CHAT,
           {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile}
         );
       }
-      this.socket.to(this.chatContactId).emit('SRV_RECEIVE_MSG', chatInfo);
+      this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, chatInfo);
     }
   }
 

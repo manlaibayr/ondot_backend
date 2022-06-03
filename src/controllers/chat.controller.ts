@@ -5,7 +5,7 @@ import {repository} from '@loopback/repository';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, NotificationRepository} from '../repositories';
-import {ChatMsgStatus, ContactStatus, UserCredentials} from '../types';
+import {ChatMsgStatus, ChatSocketMsgType, ContactStatus, MainSocketMsgType, UserCredentials} from '../types';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace, Server} from 'socket.io';
 import {ChatContact} from '../models';
@@ -46,11 +46,11 @@ export class ChatController {
       });
       await this.chatMsgRepository.updateAll({msgSenderStatus: ChatMsgStatus.DELETE}, {chatContactId, senderUserId: currentUser.userId});
       await this.chatMsgRepository.updateAll({msgReceiverStatus: ChatMsgStatus.DELETE}, {chatContactId, receiverUserId: currentUser.userId});
-      nspChat.to(chatContactId).emit('SRV_CONTACT_CHANGE', {});
+      nspChat.to(chatContactId).emit(ChatSocketMsgType.SRV_CONTACT_CHANGE, {});
     } else {
       return;
     }
-    nspMain.to(otherUserId).emit('SRV_CHANGE_CONTACT_LIST', {});
+    nspMain.to(otherUserId).emit(MainSocketMsgType.SRV_CHANGE_CONTACT_LIST, {});
   }
 
   @get('/chats/contact-list')

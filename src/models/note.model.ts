@@ -28,6 +28,11 @@ export class Note extends Entity {
   noteMsg: string;
 
   @property({
+    type: 'string',
+  })
+  noteAnswerMsg: string;
+
+  @property({
     type: 'date',
     default: "$now"
   })

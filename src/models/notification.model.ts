@@ -1,5 +1,5 @@
 import {Entity, model, property} from '@loopback/repository';
-import {ServiceType} from '../types';
+import {NotificationType, ServiceType} from '../types';
 
 @model()
 export class Notification extends Entity {
@@ -31,6 +31,15 @@ export class Notification extends Entity {
     type: 'string',
     required: true,
     jsonSchema: {
+      enum: Object.values(NotificationType),
+    },
+  })
+  notificationType: NotificationType;
+
+  @property({
+    type: 'string',
+    required: true,
+    jsonSchema: {
       enum: Object.values(ServiceType),
     },
   })
@@ -47,6 +56,11 @@ export class Notification extends Entity {
     default: false
   })
   notificationDelete: boolean;
+
+  @property({
+    type: 'string',
+  })
+  notificationDesc?: string;
 
   @property({
     type: 'date',

@@ -5,7 +5,7 @@ import {UserProfile} from '@loopback/security';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
-import {ContactStatus, ServiceType, UserCredentials} from '../types';
+import {ContactStatus, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
 import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
 
@@ -76,6 +76,7 @@ export class MeetingController {
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: userId,
       notificationMsg: myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.',
+      notificationType: NotificationType.CHAT_REQUEST,
       notificationServiceType: ServiceType.MEETING,
     });
     let chatContactInfo = await this.chatContactRepository.findOne({
@@ -95,7 +96,7 @@ export class MeetingController {
         contactServiceType: ServiceType.MEETING
       });
     }
-    nspMain.to(userId).emit('SRV_REQUEST_CHAT', {
+    nspMain.to(userId).emit(MainSocketMsgType.SRV_REQUEST_CHAT, {
       callUserId: currentUser.userId,
       callUserName: myMeetingInfo?.meetingNickname,
       callUserProfile: myMeetingInfo?.meetingPhotoMain,
