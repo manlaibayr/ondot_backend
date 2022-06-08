@@ -2,6 +2,7 @@ import {Entity, hasMany, hasOne, model, property} from '@loopback/repository';
 import {Rolemapping} from './rolemapping.model';
 import {UserType, SignupType} from '../types';
 import {MeetingProfile} from './meeting-profile.model';
+import {HobbyProfile} from './hobby-profile.model';
 
 @model()
 export class User extends Entity {
@@ -99,6 +100,11 @@ export class User extends Entity {
   meetingProfileId?: string;
 
   @property({
+    type: 'string'
+  })
+  hobbyProfileId?: string;
+
+  @property({
     type: 'date',
     default: "$now"
   })
@@ -110,6 +116,9 @@ export class User extends Entity {
   @hasOne(() => MeetingProfile, {keyTo: 'userId'})
   meetingProfile?: MeetingProfile;
 
+  @hasOne(() => HobbyProfile, {keyTo: 'userId'})
+  hobbyProfile?: HobbyProfile;
+
   constructor(data?: Partial<User>) {
     super(data);
   }
@@ -119,6 +128,7 @@ export interface UserRelations {
   // describe navigational properties here
   rolemapping?: Rolemapping[];
   meetingProfile?: MeetingProfile;
+  hobbyProfile? : HobbyProfile;
 }
 
 export type UserWithRelations = User & UserRelations;

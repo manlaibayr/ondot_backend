@@ -1,7 +1,7 @@
 import {get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody, response, Response, RestBindings} from '@loopback/rest';
 import {Count, Filter, repository} from '@loopback/repository';
 import {Getter, inject} from '@loopback/core';
-import {MeetingProfileRepository, RolemappingRepository, UserRepository, VerifyCodeRepository, VerifytokenRepository} from '../repositories';
+import {HobbyProfileRepository, MeetingProfileRepository, RolemappingRepository, UserRepository, VerifyCodeRepository, VerifytokenRepository} from '../repositories';
 import {promisify} from 'util';
 import uid from 'uid2';
 import {AuthenticationBindings} from '@loopback/authentication';
@@ -29,6 +29,7 @@ export class UserController {
     @repository(VerifytokenRepository) private verifytokenRepository: VerifytokenRepository,
     @repository(VerifyCodeRepository) private verifyCodeRepository: VerifyCodeRepository,
     @repository(MeetingProfileRepository) private profileMeetingRepository: MeetingProfileRepository,
+    @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
@@ -210,6 +211,7 @@ export class UserController {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const userInfo = await this.userRepository.findById(currentUser.userId);
     const profileMeeting = await this.profileMeetingRepository.findOne({where: {userId: currentUser.userId}});
+    const profileHobby = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
     return {
       id: userInfo.id,
       username: userInfo.username,
@@ -218,6 +220,7 @@ export class UserController {
       userFlower: userInfo.userFlower,
       profile: {
         meeting: profileMeeting,
+        hobby: profileHobby,
       }
     };
   }

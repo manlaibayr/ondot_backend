@@ -21,3 +21,6 @@ export * from './visit.model';
 export * from './report.model';
 export * from './block-user.model';
 export * from './block-phone.model';
+export * from './hobby-profile.model';
+export * from './hobby-room.model';
+export * from './hobby-room-member.model';

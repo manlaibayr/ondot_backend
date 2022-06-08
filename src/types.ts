@@ -82,3 +82,18 @@ export enum NotificationType {
   NOTE_ANSWER = 'NOTE_ANSWER',
   CHAT_REQUEST = 'CHAT_REQUEST',
 }
+
+export enum RoomRoleType {
+  ADMIN = 'ADMIN',
+  MEMBER = 'MEMBER'
+}
+
+export enum RoomMemberJoinType {
+  CREATOR = 'CREATOR',
+  INVITE_SEND = 'INVITE_SEND',
+  INVITE_REJECT = 'INVITE_REJECT',
+  INVITE_ALLOW = 'INVITE_ALLOW',
+  REQUEST_RECV = 'REQUEST_RECV',
+  REQUEST_REJECT = 'REQUEST_REJECT',
+  REQUEST_ALLOW = 'REQUEST_ALLOW',
+}

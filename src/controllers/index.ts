@@ -17,3 +17,5 @@ export * from './rating.controller';
 export * from './visit.controller';
 export * from './report.controller';
 export * from './block.controller';
+export * from './hobby-profile.controller';
+export * from './hobby-room.controller';
