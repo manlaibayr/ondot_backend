@@ -1,5 +1,6 @@
 import {Entity, hasMany, hasOne, model, property} from '@loopback/repository';
 import {HobbyRoomMember} from './hobby-room-member.model';
+import {HobbyRoomBoard} from './hobby-room-board.model';
 
 @model({settings: {mysql: {table: 'hobby_room'}}})
 export class HobbyRoom extends Entity {
@@ -151,6 +152,9 @@ export class HobbyRoom extends Entity {
   @hasMany<HobbyRoomMember>(() => HobbyRoomMember, {keyTo: 'roomId'})
   roomMembers?: HobbyRoomMember[]
 
+  @hasMany<HobbyRoomBoard>(() => HobbyRoomBoard, {keyTo: 'boardRoomId'})
+  roomBoards?: HobbyRoomMember[]
+
   constructor(data?: Partial<HobbyRoom>) {
     super(data);
   }
@@ -158,7 +162,8 @@ export class HobbyRoom extends Entity {
 
 export interface HobbyRoomRelations {
   // describe navigational properties here
-  roomMembers?: HobbyRoomMember[]
+  roomMembers?: HobbyRoomMember[];
+  roomBoards?: HobbyRoomBoard[];
 }
 
 export type HobbyRoomWithRelations = HobbyRoom & HobbyRoomRelations;

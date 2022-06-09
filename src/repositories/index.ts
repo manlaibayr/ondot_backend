@@ -24,3 +24,4 @@ export * from './report.repository';
 export * from './hobby-profile.repository';
 export * from './hobby-room.repository';
 export * from './hobby-room-member.repository';
+export * from './hobby-room-board.repository';

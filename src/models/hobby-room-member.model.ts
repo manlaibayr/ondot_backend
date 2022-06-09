@@ -25,6 +25,11 @@ export class HobbyRoomMember extends Entity {
 
   @property({
     type: 'string',
+  })
+  memberRequestText: string;
+
+  @property({
+    type: 'string',
     required: true,
     jsonSchema: {
       enum: Object.values(RoomRoleType),

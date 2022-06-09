@@ -24,3 +24,4 @@ export * from './block-phone.model';
 export * from './hobby-profile.model';
 export * from './hobby-room.model';
 export * from './hobby-room-member.model';
+export * from './hobby-room-board.model';
