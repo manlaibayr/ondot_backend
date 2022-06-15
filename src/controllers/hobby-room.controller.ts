@@ -1,13 +1,13 @@
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
-import {del, get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody, response} from '@loopback/rest';
-import {Count, CountSchema, repository} from '@loopback/repository';
+import {del, get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody} from '@loopback/rest';
+import {repository} from '@loopback/repository';
 import moment from 'moment';
 import {RoomMemberJoinType, RoomRoleType, UserCredentials} from '../types';
-import {FlowerHistoryRepository, HobbyProfileRepository, HobbyRoomBoardRepository, HobbyRoomMemberRepository, HobbyRoomRepository, UserRepository} from '../repositories';
+import {FlowerHistoryRepository, HobbyProfileRepository, HobbyRoomBoardRepository, HobbyRoomMemberRepository, HobbyRoomQuestionRepository, HobbyRoomRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
-import {HobbyRoom, MeetingProfile} from '../models';
+import {HobbyRoom} from '../models';
 
 export class HobbyRoomController {
   constructor(
@@ -17,8 +17,23 @@ export class HobbyRoomController {
     @repository(UserRepository) public userRepository: UserRepository,
     @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @repository(HobbyRoomBoardRepository) public hobbyRoomBoardRepository: HobbyRoomBoardRepository,
+    @repository(HobbyRoomQuestionRepository) public hobbyRoomQuestionRepository: HobbyRoomQuestionRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {}
+
+  @get('/hobby-rooms')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomList(
+  ) {
+    const roomList = await this.hobbyRoomRepository.find({});
+    return roomList.map((room) => ({
+      id: room.id,
+      roomTitle: room.roomTitle,
+      roomRegion: room.roomRegion,
+      roomPhotoMain: room.roomPhotoMain,
+      roomMemberNumber: room.roomMemberNumber,
+    }));
+  }
 
   @post('/hobby-rooms')
   @secured(SecuredType.IS_AUTHENTICATED)
@@ -78,6 +93,31 @@ export class HobbyRoomController {
     return this.hobbyRoomRepository.updateById(roomId, roomData);
   }
 
+  @get('/hobby-rooms/{roomId}')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomInfo(
+    @param.path.string('roomId') roomId: string
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
+    const isRoomAdmin = currentUser.userId === roomInfo.userId;
+    const roomJoin = await this.hobbyRoomMemberRepository.findOne({where: {roomId, memberUserId: currentUser.userId, memberIsAllow: true}});
+    return {...roomInfo, isRoomAdmin, isRoomJoin: !!roomJoin};
+  }
+
+  @del('/hobby-rooms/{roomId}')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomDel(
+    @param.path.string('roomId') roomId: string,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
+    if(roomInfo.userId !== currentUser.userId)  throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    await this.hobbyRoomMemberRepository.deleteAll({roomId});
+    await this.hobbyRoomBoardRepository.deleteAll({boardRoomId: roomId});
+    await this.hobbyRoomRepository.deleteById(roomId);
+  }
+
   @get('/hobby-rooms/{roomId}/recommend-users')
   @secured(SecuredType.IS_AUTHENTICATED)
   async hobbyRoomCreateRecommendUsers(
@@ -115,31 +155,6 @@ export class HobbyRoomController {
     })));
   }
 
-  @get('/hobby-rooms')
-  @secured(SecuredType.IS_AUTHENTICATED)
-  async hobbyRoomList(
-  ) {
-    const roomList = await this.hobbyRoomRepository.find({});
-    return roomList.map((room) => ({
-      id: room.id,
-      roomTitle: room.roomTitle,
-      roomRegion: room.roomRegion,
-      roomPhotoMain: room.roomPhotoMain,
-      roomMemberNumber: room.roomMemberNumber,
-    }));
-  }
-
-  @get('/hobby-rooms/{roomId}')
-  @secured(SecuredType.IS_AUTHENTICATED)
-  async hobbyRoomInfo(
-    @param.path.string('roomId') roomId: string
-  ) {
-    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
-    const isRoomAdmin = currentUser.userId === roomInfo.userId;
-    return {...roomInfo, isRoomAdmin};
-  }
-
   @get('/hobby-rooms/{roomId}/members')
   @secured(SecuredType.IS_AUTHENTICATED)
   async hobbyRoomMembers(
@@ -163,7 +178,9 @@ export class HobbyRoomController {
       nickname: m.hobbyProfile?.hobbyNickname,
       profile: m.hobbyProfile?.hobbyPhoto,
       residence: m.hobbyProfile?.hobbyResidence,
+      memberId: m.id,
       memberJoinStatus: m.memberJoinStatus,
+      memberJoinText: m.memberJoinText,
       memberIsAllow: m.memberIsAllow,
       updateAt: m.updatedAt,
     }));
@@ -250,5 +267,56 @@ export class HobbyRoomController {
     const roomInfo = await this.hobbyRoomRepository.findById(roomId);
     if (roomInfo.userId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
     return this.hobbyRoomBoardRepository.deleteById(boardId);
+  }
+
+  @post('/hobby-rooms/{roomId}/join-request')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomJoinRequest(
+    @param.path.string('roomId') roomId: string,
+    @requestBody() data: {text: string}
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const memberInfo = await this.hobbyRoomMemberRepository.findOne({where: {roomId, memberUserId: currentUser.userId}});
+    if(memberInfo) throw new HttpErrors.BadRequest('이미 신청을 했습니다.');
+    await this.hobbyRoomMemberRepository.create({
+      roomId,
+      memberUserId: currentUser.userId,
+      memberJoinText: data.text,
+      memberRole: RoomRoleType.MEMBER,
+      memberJoinStatus: RoomMemberJoinType.REQUEST_RECV,
+      memberIsAllow: false
+    });
+  }
+
+  @post('/hobby-rooms/{roomId}/question')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomQuestion(
+    @param.path.string('roomId') roomId: string,
+    @requestBody() data: {text: string}
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
+    await this.hobbyRoomQuestionRepository.create({
+      questionRoomId: roomId,
+      questionAdminId: roomInfo.userId,
+      questionUserId: currentUser.userId,
+      questionText: data.text,
+    });
+  }
+
+  @post('/hobby-rooms/{roomId}/member-change')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomMemberChange(
+    @param.path.string('roomId') roomId: string,
+    @requestBody() data: {memberId: string, type: RoomMemberJoinType}
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
+    if (roomInfo.userId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    const updateData: any = {memberJoinStatus: data.type};
+    if(data.type === RoomMemberJoinType.REQUEST_ALLOW) updateData.memberIsAllow = true;
+    await this.hobbyRoomMemberRepository.updateById(data.memberId, updateData)
+    const memberCount = await this.hobbyRoomMemberRepository.count({roomId, memberIsAllow: true});
+    await this.hobbyRoomRepository.updateById(roomId, {roomMemberNumber: memberCount.count});
   }
 }

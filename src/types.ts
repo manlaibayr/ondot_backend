@@ -97,3 +97,8 @@ export enum RoomMemberJoinType {
   REQUEST_REJECT = 'REQUEST_REJECT',
   REQUEST_ALLOW = 'REQUEST_ALLOW',
 }
+
+export enum ChatType {
+  PRIVATE_CHAT = 'PRIVATE_CHAT',
+  GROUP_CHAT = 'GROUP_CHAT'
+}

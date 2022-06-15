@@ -4,7 +4,14 @@ import {UserProfile} from '@loopback/security';
 import {repository} from '@loopback/repository';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
-import {ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, NotificationRepository} from '../repositories';
+import {
+  ChatContactRepository,
+  ChatMsgRepository,
+  HobbyRoomMemberRepository,
+  HobbyRoomRepository,
+  MeetingProfileRepository,
+  NotificationRepository
+} from '../repositories';
 import {ChatMsgStatus, ChatSocketMsgType, ContactStatus, MainSocketMsgType, UserCredentials} from '../types';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace, Server} from 'socket.io';
@@ -16,6 +23,8 @@ export class ChatController {
     @repository(ChatMsgRepository) public chatMsgRepository: ChatMsgRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
+    @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
+    @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
@@ -82,12 +91,12 @@ export class ChatController {
     // 접속한 회원 리스트
     const rooms: any = nspMain.adapter.rooms;
     const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
-    const result = [];
+    const meetingContacts = [];
     for (const v of contactList) {
       const findObj = meetingProfileList.find((p) => p.userId === v.otherUserId);
       const unReadCount = await this.chatMsgRepository.count({chatContactId: v.id, receiverUserId: currentUser.userId, msgReceiverStatus: ChatMsgStatus.UNREAD});
       const lastChat = await this.chatMsgRepository.findOne({where: {chatContactId: v.id}, order: ['createdAt desc']});
-      result.push({
+      meetingContacts.push({
         ...v,
         nickname: findObj?.meetingNickname,
         profile: findObj?.meetingPhotoMain,
@@ -96,6 +105,14 @@ export class ChatController {
         isOnline: onlineUserIds.indexOf(v.otherUserId) !== -1,
       });
     }
-    return result;
+    const roomList = await this.hobbyRoomMemberRepository.find({where: {memberUserId: currentUser.userId}, include: [{relation: 'hobbyRoom'}]});
+    const hobbyContacts = roomList.map((r) => ({
+      id: r.roomId,
+      roomTitle: r.hobbyRoom?.roomTitle,
+      roomRegion: r.hobbyRoom?.roomRegion,
+      roomMemberNumber: r.hobbyRoom?.roomMemberNumber,
+      roomPhotoMain: r.hobbyRoom?.roomPhotoMain,
+    }));
+    return {meeting: meetingContacts, hobby: hobbyContacts};
   }
 }

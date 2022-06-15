@@ -1,6 +1,7 @@
-import {Entity, hasOne, model, property} from '@loopback/repository';
+import {belongsTo, Entity, hasOne, model, property} from '@loopback/repository';
 import {RoomMemberJoinType, RoomRoleType} from '../types';
 import {HobbyProfile} from './hobby-profile.model';
+import {HobbyRoom, HobbyRoomWithRelations} from './hobby-room.model';
 
 @model({settings: {mysql: {table: 'hobby_room_member'}}})
 export class HobbyRoomMember extends Entity {
@@ -11,10 +12,7 @@ export class HobbyRoomMember extends Entity {
   })
   id: string;
 
-  @property({
-    type: 'string',
-    required: true,
-  })
+  @belongsTo(() => HobbyRoom, {keyTo: 'roomId', name: 'hobbyRoom'})
   roomId: string;
 
   @property({
@@ -26,7 +24,7 @@ export class HobbyRoomMember extends Entity {
   @property({
     type: 'string',
   })
-  memberRequestText: string;
+  memberJoinText?: string;
 
   @property({
     type: 'string',
@@ -76,6 +74,7 @@ export class HobbyRoomMember extends Entity {
 export interface HobbyRoomMemberRelations {
   // describe navigational properties here
   hobbyProfile? : HobbyProfile;
+  hobbyRoom?: HobbyRoomWithRelations;
 }
 
 export type HobbyRoomMemberWithRelations = HobbyRoomMember & HobbyRoomMemberRelations;

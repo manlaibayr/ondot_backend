@@ -1,12 +1,22 @@
+import {HttpErrors} from '@loopback/rest';
+import {repository} from '@loopback/repository';
 import {Namespace, Socket} from 'socket.io';
 import jwt from 'jsonwebtoken';
+import moment from 'moment';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {CONFIG} from '../config';
-import {repository} from '@loopback/repository';
 import {User, Verifytoken} from '../models';
-import {BlockUserRepository, ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, UserRepository, VerifytokenRepository} from '../repositories';
-import {ChatMsgStatus, ChatSocketMsgType, ContactStatus, MainSocketMsgType, ServiceType, UserType} from '../types';
-import {HttpErrors} from '@loopback/rest';
+import {
+  BlockUserRepository,
+  ChatContactRepository,
+  ChatGroupMsgRepository,
+  ChatMsgRepository,
+  HobbyProfileRepository,
+  MeetingProfileRepository,
+  UserRepository,
+  VerifytokenRepository,
+} from '../repositories';
+import {ChatMsgStatus, ChatSocketMsgType, ChatType, ContactStatus, MainSocketMsgType, ServiceType, UserType} from '../types';
 
 const socketUserInfo: {[key: string]: any;} = {};
 
@@ -17,6 +27,7 @@ const socketUserInfo: {[key: string]: any;} = {};
 @ws({name: 'chat', namespace: '/ws/chat'})
 export class ChatControllerWs {
   private chatContactId: string;  // same with live id
+  private chatType: ChatType;
   private meInfo: {id: string, nickname?: string, profile?: string};
   private otherInfo: {id: string, nickname?: string, profile?: string, isBlock?: boolean};
   private otherDeleted: boolean;
@@ -29,6 +40,8 @@ export class ChatControllerWs {
     @repository(ChatMsgRepository) private chatMsgRepository: ChatMsgRepository,
     @repository(MeetingProfileRepository) private meetingProfileRepository: MeetingProfileRepository,
     @repository(BlockUserRepository) private blockUserRepository: BlockUserRepository,
+    @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
+    @repository(ChatGroupMsgRepository) private chatGroupMsgRepository: ChatGroupMsgRepository,
   ) {
   }
 
@@ -77,21 +90,60 @@ export class ChatControllerWs {
         }
 
         // send previous message and info;
+        let result: any;
         this.chatContactId = this.socket.client.request.headers.chatcontactid;
+        this.chatType = this.socket.client.request.headers.chattype;
         this.socket.join(this.chatContactId);
-        const contactInfo = await this.getContactInfo(user.id);
-        const previousChat = await this.chatMsgRepository.find({where: {chatContactId: this.chatContactId}});
-        this.meInfo = contactInfo.meProfile;
-        this.otherInfo = contactInfo.otherProfile;
-        this.otherDeleted = contactInfo.otherDeleted;
-        const result = {
-          ...contactInfo,
-          previousChat
+        if(this.chatType === ChatType.PRIVATE_CHAT) {
+          const contactInfo = await this.getContactInfo(user.id);
+          const previousChatList = await this.chatMsgRepository.find({where: {chatContactId: this.chatContactId}, order: ['createdAt asc']});
+          this.meInfo = contactInfo.meProfile;
+          this.otherInfo = contactInfo.otherProfile;
+          this.otherDeleted = contactInfo.otherDeleted;
+          const previousChat = previousChatList.map((v) => ({
+            id: v.id,
+            type: v.msgType,
+            content: v.msgContent,
+            targetId: v.senderUserId,
+            chatInfo: {
+              avatar: this.otherInfo.profile,
+              id: this.otherInfo.id,
+              nickName: this.otherInfo.nickname,
+            },
+            // renderTime: true,
+            sendStatus: 1,
+            time: moment(v.createdAt).unix() * 1000,
+          }))
+          result = {
+            ...contactInfo,
+            previousChat
+          }
+          // 이전의 채팅모두 읽음으로 표시
+          await this.chatMsgRepository.updateAll({msgReceiverStatus: ChatMsgStatus.READ}, {chatContactId: this.chatContactId, receiverUserId: this.meInfo.id});
+        } else if(this.chatType === ChatType.GROUP_CHAT) {
+          const hobbyProfile = await this.hobbyProfileRepository.findOne({where: {userId: user.id}});
+          if(!hobbyProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
+          this.meInfo = {id: hobbyProfile.userId, profile: hobbyProfile.hobbyPhoto, nickname: hobbyProfile.hobbyNickname};
+          const previousChatList = await this.chatGroupMsgRepository.find({where: {groupRoomId: this.chatContactId}, include: [{relation: 'hobbyProfile'}], order: ['createdAt asc']});
+          const previousChat = previousChatList.map((v) => ({
+            id: v.id,
+            type: v.groupMsgType,
+            content: v.groupMsgContent,
+            targetId: v.groupSenderUserId,
+            chatInfo: {
+              avatar: v.hobbyProfile?.hobbyPhoto,
+              id: v.groupSenderUserId,
+              nickName: v.hobbyProfile?.hobbyNickname,
+            },
+            // renderTime: true,
+            sendStatus: 1,
+            time: moment(v.createdAt).unix() * 1000,
+          }))
+          result = {meProfile: this.meInfo, previousChat};
+        } else {
+          throw new HttpErrors.BadRequest('잘못된 요청입니다.');
         }
         this.socket.emit(ChatSocketMsgType.SRV_PREVIOUS_CHAT_LIST, result);
-
-        // 이전의 채팅모두 읽음으로 표시
-        await this.chatMsgRepository.updateAll({msgReceiverStatus: ChatMsgStatus.READ}, {chatContactId: this.chatContactId, receiverUserId: this.meInfo.id});
       } catch (e) {
         console.error(e);
         // this.socket.disconnect();
@@ -121,25 +173,63 @@ export class ChatControllerWs {
     chatMsg: any,
     @ws.namespace('main') nspMain: Namespace,
   ) {
-    const chatInfo = await this.chatMsgRepository.create({
-      chatContactId: this.chatContactId,
-      senderUserId: this.meInfo.id,
-      receiverUserId: this.otherInfo.id,
-      msgContent: chatMsg.content,
-      msgType: chatMsg.type,
-      msgSenderStatus: ChatMsgStatus.READ,
-      msgReceiverStatus: this.socket.adapter.rooms[this.chatContactId].length > 1 ? ChatMsgStatus.READ : ChatMsgStatus.UNREAD
-    });
+    if(this.chatType === ChatType.PRIVATE_CHAT) {
+      const chatInfo = await this.chatMsgRepository.create({
+        chatContactId: this.chatContactId,
+        senderUserId: this.meInfo.id,
+        receiverUserId: this.otherInfo.id,
+        msgContent: chatMsg.content,
+        msgType: chatMsg.type,
+        msgSenderStatus: ChatMsgStatus.READ,
+        msgReceiverStatus: this.socket.adapter.rooms[this.chatContactId].length > 1 ? ChatMsgStatus.READ : ChatMsgStatus.UNREAD
+      });
 
-    //차단정보
-    const blockUserInfo = await this.blockUserRepository.findOne({where: {blockUserId: this.otherInfo.id, blockOtherUserId: this.meInfo.id}});
-    if(!this.otherDeleted && !blockUserInfo) {
-      if(this.socket.adapter.rooms[this.chatContactId].length < 2) {
-        nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_USER_CHAT,
-          {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile}
-        );
+      //차단정보
+      const blockUserInfo = await this.blockUserRepository.findOne({where: {blockUserId: this.otherInfo.id, blockOtherUserId: this.meInfo.id}});
+      if (!this.otherDeleted && !blockUserInfo) {
+        if (this.socket.adapter.rooms[this.chatContactId].length < 2) {
+          nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_USER_CHAT,
+            {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile}
+          );
+        }
+        this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
+          id: chatInfo.id,
+          type: chatInfo.msgType,
+          content: chatInfo.msgContent,
+          targetId: chatInfo.senderUserId,
+          chatInfo: {
+            avatar: this.meInfo.profile,
+            id: this.meInfo.id,
+            nickName: this.meInfo.nickname,
+          },
+          // renderTime: true,
+          sendStatus: 1,
+          time: moment(chatInfo.createdAt).unix() * 1000,
+        });
       }
-      this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, chatInfo);
+    } else if(this.chatType === ChatType.GROUP_CHAT) {
+      const msgInfo = await this.chatGroupMsgRepository.create({
+        groupRoomId: this.chatContactId,
+        groupSenderUserId: this.meInfo.id,
+        groupMsgContent: chatMsg.content,
+        groupMsgType: chatMsg.type
+      });
+      this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
+        id: msgInfo.id,
+        type: msgInfo.groupMsgType,
+        content: msgInfo.groupMsgContent,
+        targetId: msgInfo.groupSenderUserId,
+        chatInfo: {
+          avatar: this.meInfo.profile,
+          id: this.meInfo.id,
+          nickName: this.meInfo.nickname,
+        },
+        // renderTime: true,
+        sendStatus: 1,
+        time: moment(msgInfo.createdAt).unix() * 1000,
+      });
+    } else {
+      throw new HttpErrors.BadRequest('잘못된 요청입니다.');
     }
   }
 

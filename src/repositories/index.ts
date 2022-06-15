@@ -25,3 +25,6 @@ export * from './hobby-profile.repository';
 export * from './hobby-room.repository';
 export * from './hobby-room-member.repository';
 export * from './hobby-room-board.repository';
+export * from './hobby-room-question.repository';
+export * from './chat-group-msg.repository';
+export * from './hobby-room-dibs.repository';

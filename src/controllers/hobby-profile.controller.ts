@@ -6,15 +6,17 @@ import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, UserCredentials} from '../types';
+import {FileUploadHandler, RoomRoleType, UserCredentials} from '../types';
 import {Utils} from '../utils';
 import {HobbyProfile} from '../models';
-import { HobbyProfileRepository, UserRepository, } from '../repositories';
+import {HobbyProfileRepository, HobbyRoomMemberRepository, HobbyRoomRepository, UserRepository} from '../repositories';
 
 export class HobbyProfileController {
   constructor(
     @repository(HobbyProfileRepository) public hobbyProfileRepository: HobbyProfileRepository,
     @repository(UserRepository) public userRepository: UserRepository,
+    @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
+    @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
@@ -82,6 +84,17 @@ export class HobbyProfileController {
   ): Promise<Count> {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     return this.hobbyProfileRepository.updateAll(hobbyProfile, {userId: currentUser.userId});
+  }
+
+  @get('/hobby-profiles/info')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyProfileInfo() {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const profile = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
+    const joinInfos = await this.hobbyRoomMemberRepository.find({where: {memberUserId: currentUser.userId, memberRole: RoomRoleType.MEMBER}, include: [{relation: 'hobbyRoom'}]});
+    const joinRooms = [];
+    const createRooms = await this.hobbyRoomRepository.find({where: {userId: currentUser.userId}});
+    const dibsRooms = [];
   }
 
   @post('/hobby-profiles/upload-file')
