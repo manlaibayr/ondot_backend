@@ -33,6 +33,11 @@ export class HobbyRoomQuestion extends Entity {
   questionText?: string;
 
   @property({
+    type: 'string',
+  })
+  questionAnswerText?: string;
+
+  @property({
     type: 'date',
     default: "$now"
   })

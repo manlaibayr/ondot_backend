@@ -1,5 +1,7 @@
-import {Entity, model, property} from '@loopback/repository';
+import {Entity, hasOne, model, property} from '@loopback/repository';
 import {NotificationType, ServiceType} from '../types';
+import {MeetingProfile} from './meeting-profile.model';
+import {HobbyProfile} from './hobby-profile.model';
 
 @model()
 export class Notification extends Entity {
@@ -68,6 +70,11 @@ export class Notification extends Entity {
   })
   createdAt?: Date;
 
+  @hasOne(() => MeetingProfile, {keyTo: 'userId', keyFrom: 'notificationSendUserId'})
+  senderMeetingProfile?: MeetingProfile;
+
+  @hasOne(() => HobbyProfile, {keyTo: 'userId', keyFrom: 'notificationSendUserId'})
+  senderHobbyProfile?: HobbyProfile;
 
   constructor(data?: Partial<Notification>) {
     super(data);
@@ -76,6 +83,8 @@ export class Notification extends Entity {
 
 export interface NotificationRelations {
   // describe navigational properties here
+  senderMeetingProfile?: MeetingProfile,
+  senderHobbyProfile?: HobbyProfile;
 }
 
 export type NotificationWithRelations = Notification & NotificationRelations;

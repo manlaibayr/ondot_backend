@@ -21,6 +21,12 @@ export enum UserType {
   USER = 'USER',
 }
 
+export enum UserStatusType {
+  'NORMAL' = 'NORMAL',  // 정상
+  'PAUSE' = 'PAUSE',    // 일시정지
+  'LEAVE' = 'LEAVE',    // 탈퇴
+}
+
 export enum SignupType {
   EMAIL = 'email',
   NAVER = 'naver',
@@ -68,6 +74,7 @@ export enum MainSocketMsgType {
   SRV_RECEIVE_NOTE = 'SRV_RECEIVE_NOTE',
   SRV_OTHER_USER_CHAT = 'SRV_OTHER_USER_CHAT',
   SRV_CHANGE_CONTACT_LIST = 'SRV_CHANGE_CONTACT_LIST',
+  SRV_NOTIFICATION = 'SRV_NOTIFICATION',
 }
 
 export enum ChatSocketMsgType {
@@ -81,6 +88,14 @@ export enum NotificationType {
   NOTE = 'NOTE',
   NOTE_ANSWER = 'NOTE_ANSWER',
   CHAT_REQUEST = 'CHAT_REQUEST',
+  ROOM_QUESTION = 'ROOM_QUESTION',
+  ROOM_ANSWER = 'ROOM_ANSWER',
+  ROOM_REQUEST_RECV = 'ROOM_REQUEST_RECV',
+  ROOM_REQUEST_ALLOW = 'ROOM_REQUEST_ALLOW',
+  ROOM_REQUEST_REJECT = 'ROOM_REQUEST_REJECT',
+  ROOM_INVITE_RECV = 'ROOM_INVITE_RECV',
+  ROOM_INVITE_ALLOW = 'ROOM_INVITE_ALLOW',
+  ROOM_INVITE_REJECT = 'ROOM_INVITE_REJECT'
 }
 
 export enum RoomRoleType {
@@ -99,6 +114,11 @@ export enum RoomMemberJoinType {
 }
 
 export enum ChatType {
-  PRIVATE_CHAT = 'PRIVATE_CHAT',
-  GROUP_CHAT = 'GROUP_CHAT'
+  MEETING_CHAT = 'MEETING_CHAT',
+  HOBBY_ROOM_CHAT = 'HOBBY_ROOM_CHAT'
+}
+
+export enum RankingType {
+  'WEEK' = 'WEEK',
+  'MONTH' = 'MONTH'
 }

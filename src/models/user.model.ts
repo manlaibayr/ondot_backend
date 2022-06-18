@@ -1,6 +1,6 @@
 import {Entity, hasMany, hasOne, model, property} from '@loopback/repository';
 import {Rolemapping} from './rolemapping.model';
-import {UserType, SignupType} from '../types';
+import {UserType, SignupType, UserStatusType} from '../types';
 import {MeetingProfile} from './meeting-profile.model';
 import {HobbyProfile} from './hobby-profile.model';
 
@@ -103,6 +103,20 @@ export class User extends Entity {
     type: 'string'
   })
   hobbyProfileId?: string;
+
+  @property({
+    type: 'string',
+    required: true,
+    jsonSchema: {
+      enum: Object.values(UserStatusType),
+    },
+  })
+  userStatus?: UserStatusType;
+
+  @property({
+    type: 'date',
+  })
+  updatedAt?: Date;
 
   @property({
     type: 'date',

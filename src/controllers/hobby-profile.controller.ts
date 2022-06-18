@@ -9,7 +9,7 @@ import {FILE_UPLOAD_SERVICE} from '../keys';
 import {FileUploadHandler, RoomRoleType, UserCredentials} from '../types';
 import {Utils} from '../utils';
 import {HobbyProfile} from '../models';
-import {HobbyProfileRepository, HobbyRoomMemberRepository, HobbyRoomRepository, UserRepository} from '../repositories';
+import {HobbyProfileRepository, HobbyRoomDibsRepository, HobbyRoomMemberRepository, HobbyRoomRepository, UserRepository} from '../repositories';
 
 export class HobbyProfileController {
   constructor(
@@ -17,6 +17,7 @@ export class HobbyProfileController {
     @repository(UserRepository) public userRepository: UserRepository,
     @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
     @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
+    @repository(HobbyRoomDibsRepository) public hobbyRoomDibsRepository: HobbyRoomDibsRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
@@ -91,10 +92,30 @@ export class HobbyProfileController {
   async hobbyProfileInfo() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const profile = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
-    const joinInfos = await this.hobbyRoomMemberRepository.find({where: {memberUserId: currentUser.userId, memberRole: RoomRoleType.MEMBER}, include: [{relation: 'hobbyRoom'}]});
-    const joinRooms = [];
+    const joinRooms = await this.hobbyRoomMemberRepository.find({where: {memberUserId: currentUser.userId, memberRole: RoomRoleType.MEMBER}, include: [{relation: 'hobbyRoom'}]});
     const createRooms = await this.hobbyRoomRepository.find({where: {userId: currentUser.userId}});
-    const dibsRooms = [];
+    const dibRooms = await this.hobbyRoomDibsRepository.find({where: {dibsUserId: currentUser.userId}, include: [{relation: 'hobbyRoom'}]});
+    return {
+      profile,
+      joinRooms: joinRooms.map((v) => v.hobbyRoom),
+      createRooms,
+      dibsRooms: dibRooms.map((v) => v.hobbyRoom),
+    }
+  }
+
+  @get('/hobby-profiles/other-info')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyOtherProfileInfo(
+    @param.query.string('userId') userId: string
+  ) {
+    const profile = await this.hobbyProfileRepository.findOne({where: {userId: userId}});
+    const joinRooms = await this.hobbyRoomMemberRepository.find({where: {memberUserId: userId, memberRole: RoomRoleType.MEMBER}, include: [{relation: 'hobbyRoom'}]});
+    const createRooms = await this.hobbyRoomRepository.find({where: {userId: userId}});
+    return {
+      profile,
+      joinRooms: joinRooms.map((v) => v.hobbyRoom),
+      createRooms,
+    }
   }
 
   @post('/hobby-profiles/upload-file')

@@ -19,3 +19,4 @@ export * from './report.controller';
 export * from './block.controller';
 export * from './hobby-profile.controller';
 export * from './hobby-room.controller';
+export * from './ranking-user.controller';

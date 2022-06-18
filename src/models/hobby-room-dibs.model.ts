@@ -1,4 +1,5 @@
-import {Entity, model, property} from '@loopback/repository';
+import {belongsTo, Entity, model, property} from '@loopback/repository';
+import {HobbyRoom, HobbyRoomWithRelations} from './hobby-room.model';
 
 @model({settings: {mysql: {table: 'hobby_room_dibs'}}})
 export class HobbyRoomDibs extends Entity {
@@ -9,10 +10,7 @@ export class HobbyRoomDibs extends Entity {
   })
   id: string;
 
-  @property({
-    type: 'string',
-    required: true,
-  })
+  @belongsTo(() => HobbyRoom, {keyTo: 'dibsRoomId', name: 'hobbyRoom'})
   dibsRoomId: string;
 
   @property({
@@ -35,6 +33,7 @@ export class HobbyRoomDibs extends Entity {
 
 export interface HobbyRoomDibsRelations {
   // describe navigational properties here
+  hobbyRoom?: HobbyRoomWithRelations;
 }
 
 export type HobbyRoomDibsWithRelations = HobbyRoomDibs & HobbyRoomDibsRelations;

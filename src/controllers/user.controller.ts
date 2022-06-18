@@ -11,7 +11,7 @@ import {OAuth2Client} from 'google-auth-library';
 import {CONFIG} from '../config';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, SignupType, UserCredentials, UserType} from '../types';
+import {FileUploadHandler, SignupType, UserCredentials, UserStatusType, UserType} from '../types';
 import {User, UserRelations, UserWithRelations} from '../models';
 import {VerifyCodeController} from './verify-code.controller';
 import moment from 'moment';
@@ -128,6 +128,7 @@ export class UserController {
       phoneNumber: signUpInfo.phoneNumber,
       refereeEmail: signUpInfo.refereeEmail,
       userType: UserType.USER,
+      userStatus: UserStatusType.NORMAL,
     });
     await this.rolemappingRepository.create({user_id: userInfo.id, role_id: UserType.USER});
     return {
@@ -310,13 +311,22 @@ export class UserController {
   async userList(
     @param.query.number('page') page: number,
     @param.query.number('count') pageCount: number,
-    @param.query.object('search') searchParam?: {text?: string},
+    @param.query.object('search') searchParam?: {text?: string, signupType?: string, userStatus?: UserStatusType},
     @param.query.object('sort') sortParam?: {field: string, asc: boolean},
   ) {
     if (page < 1) throw new HttpErrors.BadRequest('param is not correct');
     const filter: Filter<User> = {};
-    if (searchParam?.text) {
-      filter.where = {or: [{username: {like: `%${searchParam.text}%`}}, {email: {like: `%${searchParam.text}%`}}]};
+
+    filter.where = {and: []};
+    if(searchParam?.signupType) filter.where.and.push({signupType: searchParam.signupType});
+    if(searchParam?.userStatus) filter.where.and.push({userStatus: searchParam.userStatus})
+    if(searchParam?.text) {
+      filter.where.and.push({
+        or: [{username: {like: `%${searchParam.text}%`}}, {email: {like: `%${searchParam.text}%`}}]
+      })
+    }
+    if(filter.where.and.length === 0) {
+      filter.where = {};
     }
 
     const totalCount: Count = await this.userRepository.count(filter.where);
@@ -325,14 +335,8 @@ export class UserController {
     if (sortParam?.field) {
       filter.order = [sortParam.field + ' ' + (sortParam.asc ? 'asc' : 'desc')];
     }
+    filter.fields = {password: false};
     const data: UserWithRelations[] = await this.userRepository.find(filter);
-    const userData = data.map((v: UserWithRelations) => ({
-      id: v.id,
-      username: v.username,
-      email: v.email,
-      signupType: v.signupType,
-      createdAt: v.createdAt,
-    }));
     return {
       meta: {
         currentPage: page,
@@ -340,7 +344,7 @@ export class UserController {
         totalItemCount: totalCount.count,
         totalPageCount: Math.ceil(totalCount.count / pageCount),
       },
-      data: userData,
+      data,
     };
   }
 

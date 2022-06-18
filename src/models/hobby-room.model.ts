@@ -139,6 +139,12 @@ export class HobbyRoom extends Entity {
   roomMemberNumber: number;
 
   @property({
+    type: 'boolean',
+    default: false,
+  })
+  isRoomDelete: boolean;
+
+  @property({
     type: 'date'
   })
   updatedAt?: Date;

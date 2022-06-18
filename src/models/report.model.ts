@@ -1,5 +1,6 @@
-import {Entity, model, property} from '@loopback/repository';
+import {belongsTo, Entity, model, property} from '@loopback/repository';
 import {ReportType, ServiceType} from '../types';
+import {User, UserWithRelations} from './user.model';
 
 @model()
 export class Report extends Entity {
@@ -10,16 +11,10 @@ export class Report extends Entity {
   })
   id: string;
 
-  @property({
-    type: 'string',
-    required: true,
-  })
+  @belongsTo(() => User, {keyTo: 'reportUserId', name: 'user'})
   reportUserId: string;
 
-  @property({
-    type: 'string',
-    required: true,
-  })
+  @belongsTo(() => User, {keyTo: 'reportOtherUserId', name: 'otherUser'})
   reportOtherUserId: string;
 
   @property({
@@ -59,6 +54,8 @@ export class Report extends Entity {
 
 export interface ReportRelations {
   // describe navigational properties here
+  user?: UserWithRelations;
+  otherUser?: UserWithRelations;
 }
 
 export type ReportWithRelations = Report & ReportRelations;

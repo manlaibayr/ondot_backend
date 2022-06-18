@@ -28,3 +28,4 @@ export * from './hobby-room-board.model';
 export * from './hobby-room-question.model';
 export * from './chat-group-msg.model';
 export * from './hobby-room-dibs.model';
+export * from './ranking-user.model';

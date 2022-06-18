@@ -5,12 +5,13 @@
 
 import {repository} from '@loopback/repository';
 import {MeetingProfileRepository, NotificationRepository} from '../repositories';
-import {del, get, param} from '@loopback/rest';
+import {del, get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {ServiceType, UserCredentials} from '../types';
+import {NotificationWithRelations} from '../models';
 
 export class NotificationController {
   constructor(
@@ -24,21 +25,71 @@ export class NotificationController {
   @secured(SecuredType.IS_AUTHENTICATED)
   async notificationData() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const list = await this.notificationRepository.find({where: {notificationReceiveUserId: currentUser.userId, notificationDelete: false}, order: ['createdAt desc']});
-    const meetingList = list.filter((v) => v.notificationServiceType === ServiceType.MEETING);
-    const meetingProfileList = await this.meetingProfileRepository.find({where: {userId: {inq: meetingList.map((v) => v.notificationSendUserId)}}});
+    const meetingList: NotificationWithRelations[] = await this.notificationRepository.find({
+      where: {notificationReceiveUserId: currentUser.userId, notificationDelete: false, notificationServiceType: ServiceType.MEETING},
+      include: [{relation: "senderMeetingProfile"}],
+      order: ['createdAt desc']
+    });
     const meeting = meetingList.map((v) => {
-      const findObj = meetingProfileList.find((p) => p.userId === v.notificationSendUserId);
       return {
         ...v,
-        nickname: findObj?.meetingNickname,
-        profile: findObj?.meetingPhotoMain,
+        notificationSenderUserId: v.notificationSendUserId,
+        notificationReceiveUserId: v.notificationReceiveUserId,
+        notificationMsg: v.notificationMsg,
+        notificationType: v.notificationType,
+        notificationShow: v.notificationShow,
+        notificationDesc: v.notificationDesc,
+        nickname: v.senderMeetingProfile?.meetingNickname,
+        profile: v.senderMeetingProfile?.meetingPhotoMain,
       };
     });
-    const learning = list.filter((v) => v.notificationServiceType === ServiceType.LEARNING);
-    const hobby = list.filter((v) => v.notificationServiceType === ServiceType.HOBBY);
-    return { meeting, learning, hobby};
+
+
+    const learningList: NotificationWithRelations[] = await this.notificationRepository.find({
+      where: {notificationReceiveUserId: currentUser.userId, notificationDelete: false, notificationServiceType: ServiceType.LEARNING},
+      order: ['createdAt desc']
+    });
+
+    const hobbyList: NotificationWithRelations[] = await this.notificationRepository.find({
+      where: {notificationReceiveUserId: currentUser.userId, notificationDelete: false, notificationServiceType: ServiceType.HOBBY},
+      include: [{relation: "senderHobbyProfile"}],
+      order: ['createdAt desc']
+    });
+    const hobby = hobbyList.map((v) => {
+      return {
+        ...v,
+        notificationSenderUserId: v.notificationSendUserId,
+        notificationReceiveUserId: v.notificationReceiveUserId,
+        notificationMsg: v.notificationMsg,
+        notificationType: v.notificationType,
+        notificationShow: v.notificationShow,
+        notificationDesc: v.notificationDesc,
+        nickname: v.senderHobbyProfile?.hobbyNickname,
+        profile: v.senderHobbyProfile?.hobbyPhoto,
+      };
+    });
+    return { meeting, learning: learningList, hobby};
   }
+
+  @get('/notifications/{id}/show')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async notificationShow(
+    @param.path.string('id') id: string,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const notificationInfo = await this.notificationRepository.findById(id);
+    if(notificationInfo.notificationReceiveUserId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    return this.notificationRepository.updateById(id, {notificationShow: true});
+  }
+
+  @get('notifications/unread-count')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async notificationUnReadCount() {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const count = await this.notificationRepository.count({notificationReceiveUserId: currentUser.userId, notificationShow: false, notificationDelete: false});
+    return {count: count.count};
+  }
+
 
   @del('/notifications/del/{id}')
   @secured(SecuredType.IS_AUTHENTICATED)
