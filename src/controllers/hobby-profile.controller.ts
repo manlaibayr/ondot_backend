@@ -6,10 +6,10 @@ import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, RoomRoleType, UserCredentials} from '../types';
+import {FileUploadHandler, RoomRoleType, ServiceType, UserCredentials} from '../types';
 import {Utils} from '../utils';
 import {HobbyProfile} from '../models';
-import {HobbyProfileRepository, HobbyRoomDibsRepository, HobbyRoomMemberRepository, HobbyRoomRepository, UserRepository} from '../repositories';
+import {BlockUserRepository, HobbyProfileRepository, HobbyRoomDibsRepository, HobbyRoomMemberRepository, HobbyRoomRepository, UserRepository} from '../repositories';
 
 export class HobbyProfileController {
   constructor(
@@ -18,6 +18,7 @@ export class HobbyProfileController {
     @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
     @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @repository(HobbyRoomDibsRepository) public hobbyRoomDibsRepository: HobbyRoomDibsRepository,
+    @repository(BlockUserRepository) public blockUserRepository: BlockUserRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
@@ -108,11 +109,13 @@ export class HobbyProfileController {
   async hobbyOtherProfileInfo(
     @param.query.string('userId') userId: string
   ) {
-    const profile = await this.hobbyProfileRepository.findOne({where: {userId: userId}});
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const otherProfile = await this.hobbyProfileRepository.findOne({where: {userId: userId}});
+    const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: otherProfile?.userId, blockServiceType: ServiceType.HOBBY}});
     const joinRooms = await this.hobbyRoomMemberRepository.find({where: {memberUserId: userId, memberRole: RoomRoleType.MEMBER}, include: [{relation: 'hobbyRoom'}]});
     const createRooms = await this.hobbyRoomRepository.find({where: {userId: userId}});
     return {
-      profile,
+      profile: {...otherProfile, isBlock: !!blockInfo},
       joinRooms: joinRooms.map((v) => v.hobbyRoom),
       createRooms,
     }

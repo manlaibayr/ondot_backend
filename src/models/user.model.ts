@@ -30,6 +30,11 @@ export class User extends Entity {
   email?: string;
 
   @property({
+    type: 'string',
+  })
+  realUserId?: string;
+
+  @property({
     type: 'boolean',
   })
   sex?: boolean;

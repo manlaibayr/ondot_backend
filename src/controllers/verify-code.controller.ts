@@ -81,6 +81,7 @@ export class VerifyCodeController {
       throw new HttpErrors.BadRequest('본인인증정보가 정확하지 않습니다.');
     }
     return {
+      realUserId: respData.ci,
       name: decodeURI(respData.utf8_name),
       sex: respData.gender === '1',
       birthday: respData.birthdate,

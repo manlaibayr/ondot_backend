@@ -1,6 +1,8 @@
-import {belongsTo, Entity, model, property} from '@loopback/repository';
+import {belongsTo, Entity, hasOne, model, property} from '@loopback/repository';
 import {ServiceType} from '../types';
 import {User, UserWithRelations} from './user.model';
+import {MeetingProfile} from './meeting-profile.model';
+import {HobbyProfile} from './hobby-profile.model';
 
 @model({settings: {mysql: {table: 'block_user'}}})
 export class BlockUser extends Entity {
@@ -17,7 +19,10 @@ export class BlockUser extends Entity {
   })
   blockUserId: string;
 
-  @belongsTo(() => User, {keyTo: 'blockOtherUserId', name: 'blockOtherUser'})
+  @property({
+    type: 'string',
+    required: true,
+  })
   blockOtherUserId: string;
 
   @property({
@@ -35,6 +40,11 @@ export class BlockUser extends Entity {
   })
   createdAt?: Date;
 
+  @hasOne(() => MeetingProfile, {keyTo: 'userId', keyFrom: 'blockOtherUserId'})
+  blockMeetingProfile?: MeetingProfile;
+
+  @hasOne(() => HobbyProfile, {keyTo: 'userId', keyFrom: 'blockOtherUserId'})
+  blockHobbyProfile?: HobbyProfile;
 
   constructor(data?: Partial<BlockUser>) {
     super(data);
@@ -43,7 +53,8 @@ export class BlockUser extends Entity {
 
 export interface BlockUserRelations {
   // describe navigational properties here
-  blockOtherUser?: UserWithRelations;
+  blockMeetingProfile?: MeetingProfile,
+  blockHobbyProfile?: HobbyProfile;
 }
 
 export type BlockUserWithRelations = BlockUser & BlockUserRelations;

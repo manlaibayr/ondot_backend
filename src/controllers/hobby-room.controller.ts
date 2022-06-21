@@ -2,7 +2,7 @@ import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {del, get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody} from '@loopback/rest';
-import {repository} from '@loopback/repository';
+import {Filter, repository} from '@loopback/repository';
 import moment from 'moment';
 import {MainSocketMsgType, NotificationType, RoomMemberJoinType, RoomRoleType, ServiceType, UserCredentials} from '../types';
 import {
@@ -38,8 +38,28 @@ export class HobbyRoomController {
 
   @get('/hobby-rooms')
   @secured(SecuredType.IS_AUTHENTICATED)
-  async hobbyRoomList() {
-    const roomList = await this.hobbyRoomRepository.find({where: {isRoomDelete: false}});
+  async hobbyRoomList(
+    @param.query.string('searchType') searchType: string,
+    @param.query.string('searchText') searchText?: string,
+    @param.query.string('searchCategory') searchCategory?: string,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const hobbyProfile = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
+    const filter: Filter<HobbyRoom> = {};
+    filter.where = {isRoomDelete: false};
+    if(searchType === 'findCategory') {
+    } else if(searchType === 'sameRegion') {
+      filter.order = ['createdAt desc'];
+    } else {
+      throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    }
+    if(searchText) {
+      filter.where.roomTitle = {like: `%${searchText}%`};
+    }
+    if(searchCategory && searchCategory !== '전체' && searchCategory !== 'all') {
+      filter.where.roomCategory = searchCategory;
+    }
+    const roomList = await this.hobbyRoomRepository.find(filter);
     return roomList.map((room) => ({
       id: room.id,
       roomTitle: room.roomTitle,

@@ -19,11 +19,11 @@ export class ReportController {
   @post('/reports')
   @secured(SecuredType.IS_AUTHENTICATED)
   async reportAdd(
-    @requestBody() data: {otherUserId: string, reportType: ReportType, reportText: string},
+    @requestBody() data: {otherUserId: string, reportType: ReportType, reportText: string, serviceType: ServiceType},
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     return this.reportRepository.create({
-      reportUserId: currentUser.userId, reportOtherUserId: data.otherUserId, reportType: data.reportType, reportText: data.reportText, reportServiceType: ServiceType.MEETING,
+      reportUserId: currentUser.userId, reportOtherUserId: data.otherUserId, reportType: data.reportType, reportText: data.reportText, reportServiceType: data.serviceType,
     });
   }
 

@@ -115,11 +115,14 @@ export class UserController {
     }
     const niceInfo = VerifyCodeController.getNicePhoneNumber(
       signUpInfo.niceAuthResp.tokenVersionId, signUpInfo.niceAuthResp.encData, signUpInfo.niceAuthResp.integrityValue, signUpInfo.niceAuthResp.token);
+    const checkRealUserCount = await this.userRepository.count({realUserId: niceInfo.realUserId});
+    if(checkRealUserCount.count > 0) throw new HttpErrors.BadRequest(niceInfo.name + '님은 이미 계정을 창조했습니다.');
     signUpInfo.phoneNumber = niceInfo.phoneNumber;
     const userInfo = await this.userRepository.create({
       username: niceInfo.name,
       password: this.generatePassword(userData.password),
       email: userData.email,
+      realUserId: niceInfo.realUserId,
       sex: niceInfo.sex,
       birthday: niceInfo.birthday,
       age: niceInfo.birthday ? moment().diff(moment(niceInfo.birthday, "YYYYMMDD"), 'years') : 0,
@@ -217,7 +220,7 @@ export class UserController {
       id: userInfo.id,
       username: userInfo.username,
       email: userInfo.email,
-      age: userInfo.birthday ? moment().diff(moment(userInfo.birthday, "YYYYMMDD"), 'years') : 0,
+      age: userInfo.age,
       userFlower: userInfo.userFlower,
       profile: {
         meeting: profileMeeting,

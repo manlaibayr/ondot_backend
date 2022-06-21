@@ -4,7 +4,7 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {BlockPhoneRepository, BlockUserRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
-import {get, post, requestBody} from '@loopback/rest';
+import {get, param, post, requestBody} from '@loopback/rest';
 import {ServiceType, UserCredentials} from '../types';
 
 export class BlockController {
@@ -19,42 +19,48 @@ export class BlockController {
   @post('/block-users')
   @secured(SecuredType.IS_AUTHENTICATED)
   async blockUserChange(
-    @requestBody() data: {otherUserId: string}
+    @requestBody() data: {otherUserId: string, serviceType: ServiceType}
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: data.otherUserId, blockServiceType: ServiceType.MEETING}});
+    const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: data.otherUserId, blockServiceType: data.serviceType}});
     if(blockInfo) {
       await this.blockUserRepository.deleteById(blockInfo.id);
       return {block: false};
     } else {
-      await this.blockUserRepository.create({blockUserId: currentUser.userId, blockOtherUserId: data.otherUserId, blockServiceType: ServiceType.MEETING});
+      await this.blockUserRepository.create({blockUserId: currentUser.userId, blockOtherUserId: data.otherUserId, blockServiceType: data.serviceType});
       return {block: true};
     }
   }
 
   @get('/block-users')
   @secured(SecuredType.IS_AUTHENTICATED)
-  async blockUserList() {
+  async blockUserList(
+    @param.query.string('serviceType') serviceType: ServiceType
+  ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const blockList = await this.blockUserRepository.find({
-      where: {blockUserId: currentUser.userId, blockServiceType: ServiceType.MEETING},
+      where: {blockUserId: currentUser.userId, blockServiceType: serviceType},
       order: ['createdAt desc'],
-      include: [{
-        relation: 'blockOtherUser',
-        scope: {
-          include: [{relation: 'meetingProfile'}],
-        },
-      }],
+      include: [{relation: (serviceType === ServiceType.MEETING ? 'blockMeetingProfile' : 'blockHobbyProfile')}]
     });
     return blockList.map((v) => ({
       isOnline: false,
-      userId: v.blockOtherUser?.id,
-      meetingProfileId: v.blockOtherUser?.meetingProfileId,
-      profile: v.blockOtherUser?.meetingProfile?.meetingPhotoMain,
-      meetingNickname: v.blockOtherUser?.meetingProfile?.meetingNickname,
-      meetingJob: v.blockOtherUser?.meetingProfile?.meetingJob,
-      meetingOtherMeeting: v.blockOtherUser?.meetingProfile?.meetingOtherMeeting,
-      meetingResidence: v.blockOtherUser?.meetingProfile?.meetingResidence,
+      blockId: v.id,
+      userId: v.blockOtherUserId,
+      profileId: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.id : v.blockHobbyProfile?.id ,
+      profile: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.meetingPhotoMain : v.blockHobbyProfile?.hobbyPhoto ,
+      nickname: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.meetingNickname : v.blockHobbyProfile?.hobbyNickname ,
+      job: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.meetingJob : '' ,
+      otherMeeting: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.meetingOtherMeeting : '' ,
+      residence: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.meetingResidence : v.blockHobbyProfile?.hobbyResidence,
+
+      // userId: v.blockOtherUser?.id,
+      // meetingProfileId: v.blockOtherUser?.meetingProfileId,
+      // profile: v.blockOtherUser?.meetingProfile?.meetingPhotoMain,
+      // meetingNickname: v.blockOtherUser?.meetingProfile?.meetingNickname,
+      // meetingJob: v.blockOtherUser?.meetingProfile?.meetingJob,
+      // meetingOtherMeeting: v.blockOtherUser?.meetingProfile?.meetingOtherMeeting,
+      // meetingResidence: v.blockOtherUser?.meetingProfile?.meetingResidence,
     }));
   }
 
