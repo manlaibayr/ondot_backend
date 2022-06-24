@@ -116,7 +116,7 @@ export class UserController {
     const niceInfo = VerifyCodeController.getNicePhoneNumber(
       signUpInfo.niceAuthResp.tokenVersionId, signUpInfo.niceAuthResp.encData, signUpInfo.niceAuthResp.integrityValue, signUpInfo.niceAuthResp.token);
     const checkRealUserCount = await this.userRepository.count({realUserId: niceInfo.realUserId});
-    if(checkRealUserCount.count > 0) throw new HttpErrors.BadRequest(niceInfo.name + '님은 이미 계정을 창조했습니다.');
+    if(checkRealUserCount.count > 0) throw new HttpErrors.BadRequest(niceInfo.name + '님은 이미 계정이 존재합니다.');
     signUpInfo.phoneNumber = niceInfo.phoneNumber;
     const userInfo = await this.userRepository.create({
       username: niceInfo.name,

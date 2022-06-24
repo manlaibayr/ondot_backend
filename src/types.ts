@@ -56,6 +56,12 @@ export enum ChatMsgStatus {
   DELETE = 'DELETE'
 }
 
+export enum ChatMsgType {
+  TEXT = 'text',
+  IMAGE = 'image',
+  VOICE = 'voice'
+}
+
 export enum AdType {
   GOOGLE_AD = 'GOOGLE_AD',
   LINK = 'LINK',
@@ -95,7 +101,8 @@ export enum NotificationType {
   ROOM_REQUEST_REJECT = 'ROOM_REQUEST_REJECT',
   ROOM_INVITE_RECV = 'ROOM_INVITE_RECV',
   ROOM_INVITE_ALLOW = 'ROOM_INVITE_ALLOW',
-  ROOM_INVITE_REJECT = 'ROOM_INVITE_REJECT'
+  ROOM_INVITE_REJECT = 'ROOM_INVITE_REJECT',
+  ROOM_KICK = 'ROOM_KICK',
 }
 
 export enum RoomRoleType {

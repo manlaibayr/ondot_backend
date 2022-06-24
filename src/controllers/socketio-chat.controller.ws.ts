@@ -11,12 +11,13 @@ import {
   ChatContactRepository,
   ChatGroupMsgRepository,
   ChatMsgRepository,
-  HobbyProfileRepository, HobbyRoomMemberRepository,
+  HobbyProfileRepository, HobbyRoomMemberRepository, HobbyRoomRepository,
   MeetingProfileRepository,
   UserRepository,
   VerifytokenRepository,
 } from '../repositories';
-import {ChatMsgStatus, ChatSocketMsgType, ChatType, ContactStatus, MainSocketMsgType, ServiceType, UserType} from '../types';
+import {ChatMsgStatus, ChatMsgType, ChatSocketMsgType, ChatType, ContactStatus, MainSocketMsgType, ServiceType, UserType} from '../types';
+import {v4 as uuidv4} from 'uuid';
 
 const socketUserInfo: {[key: string]: any;} = {};
 
@@ -43,6 +44,7 @@ export class ChatControllerWs {
     @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
     @repository(ChatGroupMsgRepository) private chatGroupMsgRepository: ChatGroupMsgRepository,
     @repository(HobbyRoomMemberRepository) private hobbyRoomMemberRepository: HobbyRoomMemberRepository,
+    @repository(HobbyRoomRepository) private hobbyRoomRepository: HobbyRoomRepository,
   ) {
   }
 
@@ -104,7 +106,7 @@ export class ChatControllerWs {
           const previousChat = previousChatList.map((v) => ({
             id: v.id,
             type: v.msgType,
-            content: v.msgContent,
+            content: v.msgType === ChatMsgType.TEXT ? v.msgContent : JSON.parse(v.msgContent ?? '{}'),
             targetId: v.senderUserId,
             chatInfo: {
               avatar: this.otherInfo.profile,
@@ -126,10 +128,10 @@ export class ChatControllerWs {
           if (!hobbyProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
           this.meInfo = {id: hobbyProfile.userId, profile: hobbyProfile.hobbyPhoto, nickname: hobbyProfile.hobbyNickname};
           const previousChatList = await this.chatGroupMsgRepository.find({where: {groupRoomId: this.chatContactId}, include: [{relation: 'hobbyProfile'}], order: ['createdAt asc']});
-          const previousChat = previousChatList.map((v) => ({
+          const previousChat: any[] = previousChatList.map((v) => ({
             id: v.id,
             type: v.groupMsgType,
-            content: v.groupMsgContent,
+            content: v.groupMsgType === ChatMsgType.TEXT ? v.groupMsgContent : JSON.parse(v.groupMsgContent ?? '{}'),
             targetId: v.groupSenderUserId,
             chatInfo: {
               avatar: v.hobbyProfile?.hobbyPhoto,
@@ -140,7 +142,8 @@ export class ChatControllerWs {
             sendStatus: 1,
             time: moment(v.createdAt).unix() * 1000,
           }));
-          result = {meProfile: this.meInfo, previousChat};
+          const hobbyRoomInfo = await this.hobbyRoomRepository.findById(this.chatContactId);
+          result = {meProfile: this.meInfo, previousChat, isRoomDelete: hobbyRoomInfo.isRoomDelete};
         } else {
           throw new HttpErrors.BadRequest('잘못된 요청입니다.');
         }
@@ -180,15 +183,15 @@ export class ChatControllerWs {
         chatContactId: this.chatContactId,
         senderUserId: this.meInfo.id,
         receiverUserId: this.otherInfo.id,
-        msgContent: chatMsg.content,
+        msgContent: chatMsg.type === ChatMsgType.TEXT ? chatMsg.content : JSON.stringify(chatMsg.content),
         msgType: chatMsg.type,
         msgSenderStatus: ChatMsgStatus.READ,
         msgReceiverStatus: this.socket.adapter.rooms[this.chatContactId].length > 1 ? ChatMsgStatus.READ : ChatMsgStatus.UNREAD,
       });
       sendMsgObj = {
         id: chatInfo.id,
-        type: chatInfo.msgType,
-        content: chatInfo.msgContent,
+        type: chatMsg.type,
+        content: chatMsg.content,
         targetId: chatInfo.senderUserId,
         chatInfo: {
           avatar: this.meInfo.profile,
@@ -199,18 +202,18 @@ export class ChatControllerWs {
         sendStatus: 1,
         time: moment(chatInfo.createdAt).unix() * 1000,
       };
-      pushMsgObj = {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile};
+      pushMsgObj = {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: (chatMsg.type === ChatMsgType.TEXT ? chatMsg.content : chatMsg.type), profile: this.meInfo.profile};
     } else if (this.chatType === ChatType.HOBBY_ROOM_CHAT) {
       const msgInfo = await this.chatGroupMsgRepository.create({
         groupRoomId: this.chatContactId,
         groupSenderUserId: this.meInfo.id,
-        groupMsgContent: chatMsg.content,
+        groupMsgContent: chatMsg.type === ChatMsgType.TEXT ? chatMsg.content : JSON.stringify(chatMsg.content),
         groupMsgType: chatMsg.type,
       });
       sendMsgObj = {
         id: msgInfo.id,
-        type: msgInfo.groupMsgType,
-        content: msgInfo.groupMsgContent,
+        type: chatMsg.type,
+        content: chatMsg.content,
         targetId: msgInfo.groupSenderUserId,
         chatInfo: {
           avatar: this.meInfo.profile,
@@ -221,7 +224,7 @@ export class ChatControllerWs {
         sendStatus: 1,
         time: moment(msgInfo.createdAt).unix() * 1000,
       };
-      pushMsgObj = {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile};
+      pushMsgObj = {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: (chatMsg.type === ChatMsgType.TEXT ? chatMsg.content : chatMsg.type), profile: this.meInfo.profile};
     } else {
       throw new HttpErrors.BadRequest('잘못된 요청입니다.');
     }
@@ -232,70 +235,11 @@ export class ChatControllerWs {
         if (this.socket.adapter.rooms[this.chatContactId].length < 2) {
           nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_USER_CHAT, pushMsgObj);
         }
-        this.socket.to(this.chatContactId).emit(sendMsgObj);
+        this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, sendMsgObj);
       }
     } else if (this.chatType === ChatType.HOBBY_ROOM_CHAT) {
-      this.socket.to(this.chatContactId).emit(sendMsgObj);
+      this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, sendMsgObj);
     }
-
-    // if(this.chatType === ChatType.MEETING_CHAT) {
-    //   const chatInfo = await this.chatMsgRepository.create({
-    //     chatContactId: this.chatContactId,
-    //     senderUserId: this.meInfo.id,
-    //     receiverUserId: this.otherInfo.id,
-    //     msgContent: chatMsg.content,
-    //     msgType: chatMsg.type,
-    //     msgSenderStatus: ChatMsgStatus.READ,
-    //     msgReceiverStatus: this.socket.adapter.rooms[this.chatContactId].length > 1 ? ChatMsgStatus.READ : ChatMsgStatus.UNREAD
-    //   });
-    //
-    //   //차단정보
-    //   const blockUserInfo = await this.blockUserRepository.findOne({where: {blockUserId: this.otherInfo.id, blockOtherUserId: this.meInfo.id}});
-    //   if (!this.otherDeleted && !blockUserInfo) {
-    //     if (this.socket.adapter.rooms[this.chatContactId].length < 2) {
-    //       nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_USER_CHAT,
-    //         {chatContactId: this.chatContactId, nickname: this.meInfo.nickname, msg: chatMsg.content, profile: this.meInfo.profile}
-    //       );
-    //     }
-    //     this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
-    //       id: chatInfo.id,
-    //       type: chatInfo.msgType,
-    //       content: chatInfo.msgContent,
-    //       targetId: chatInfo.senderUserId,
-    //       chatInfo: {
-    //         avatar: this.meInfo.profile,
-    //         id: this.meInfo.id,
-    //         nickName: this.meInfo.nickname,
-    //       },
-    //       // renderTime: true,
-    //       sendStatus: 1,
-    //       time: moment(chatInfo.createdAt).unix() * 1000,
-    //     });
-    //   }
-    // } else if(this.chatType === ChatType.HOBBY_ROOM_CHAT) {
-    //   const msgInfo = await this.chatGroupMsgRepository.create({
-    //     groupRoomId: this.chatContactId,
-    //     groupSenderUserId: this.meInfo.id,
-    //     groupMsgContent: chatMsg.content,
-    //     groupMsgType: chatMsg.type
-    //   });
-    //   this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
-    //     id: msgInfo.id,
-    //     type: msgInfo.groupMsgType,
-    //     content: msgInfo.groupMsgContent,
-    //     targetId: msgInfo.groupSenderUserId,
-    //     chatInfo: {
-    //       avatar: this.meInfo.profile,
-    //       id: this.meInfo.id,
-    //       nickName: this.meInfo.nickname,
-    //     },
-    //     // renderTime: true,
-    //     sendStatus: 1,
-    //     time: moment(msgInfo.createdAt).unix() * 1000,
-    //   });
-    // } else {
-    //   throw new HttpErrors.BadRequest('잘못된 요청입니다.');
-    // }
   }
 
 

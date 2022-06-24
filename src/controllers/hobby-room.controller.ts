@@ -4,7 +4,8 @@ import {UserProfile} from '@loopback/security';
 import {del, get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody} from '@loopback/rest';
 import {Filter, repository} from '@loopback/repository';
 import moment from 'moment';
-import {MainSocketMsgType, NotificationType, RoomMemberJoinType, RoomRoleType, ServiceType, UserCredentials} from '../types';
+import {v4 as uuidv4} from 'uuid';
+import {ChatSocketMsgType, MainSocketMsgType, NotificationType, RoomMemberJoinType, RoomRoleType, ServiceType, UserCredentials} from '../types';
 import {
   FlowerHistoryRepository,
   HobbyProfileRepository,
@@ -236,6 +237,7 @@ export class HobbyRoomController {
       memberJoinText: m.memberJoinText,
       memberIsAllow: m.memberIsAllow,
       updateAt: m.updatedAt,
+      isRoomCreator: m.hobbyProfile?.userId === roomInfo.userId
     }));
     const invites = !isRoomAdmin ? [] : members?.filter((v) => {
       if (v.memberJoinStatus === RoomMemberJoinType.INVITE_SEND) {
@@ -259,13 +261,54 @@ export class HobbyRoomController {
   async hobbyRoomRemoveMember(
     @param.path.string('roomId') roomId: string,
     @param.query.string('userId') userId: string,
+    @ws.namespace('chat') nspChat: Server,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const roomInfo = await this.hobbyRoomRepository.findById(roomId);
     if (roomInfo.userId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
     await this.hobbyRoomMemberRepository.deleteAll({roomId: roomId, memberUserId: userId});
+    const removeUserInfo = await this.hobbyProfileRepository.findOne({where: {userId}});
     const memberNumber = await this.hobbyRoomMemberRepository.count({roomId: roomId, memberIsAllow: true});
     await this.hobbyRoomRepository.updateById(roomId, {roomMemberNumber: memberNumber.count});
+    nspChat.to(roomId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
+      id: uuidv4(),
+      type: 'system',
+      content: removeUserInfo?.hobbyNickname + '님이 방장에 의해 강퇴되었습니다.',
+      chatInfo: {},
+    });
+  }
+
+  @post('/hobby-rooms/{roomId}/remove-users')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomRemoveUsers(
+    @param.path.string('roomId') roomId: string,
+    @requestBody() userIds: string[],
+    @ws.namespace('main') nspMain: Server,
+    @ws.namespace('chat') nspChat: Server,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
+    if (roomInfo.userId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    await this.hobbyRoomMemberRepository.deleteAll({roomId: roomId, memberUserId: {inq: userIds}});
+    const removeProfileList = await this.hobbyProfileRepository.find({where: {userId: {inq: userIds}}});
+    const memberNumber = await this.hobbyRoomMemberRepository.count({roomId: roomId, memberIsAllow: true});
+    await this.hobbyRoomRepository.updateById(roomId, {roomMemberNumber: memberNumber.count});
+    nspChat.to(roomId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
+      id: uuidv4(),
+      type: 'system',
+      content: removeProfileList.map((v) => v?.hobbyNickname).join(',') + '님이 방장에 의해 강퇴되었습니다.',
+      chatInfo: {},
+    });
+    await this.notificationRepository.createAll(
+      removeProfileList.map((p) => ({
+        notificationSendUserId: currentUser.userId,
+        notificationReceiveUserId: p.userId,
+        notificationMsg: `${roomInfo.roomTitle}모임방 에서 강퇴되었습니다.`,
+        notificationType: NotificationType.ROOM_KICK,
+        notificationServiceType: ServiceType.HOBBY,
+        notificationDesc: roomId,
+      })),
+    );
   }
 
   @get('/hobby-rooms/{roomId}/boards')
@@ -328,6 +371,7 @@ export class HobbyRoomController {
     @param.path.string('roomId') roomId: string,
     @requestBody() data: {text: string},
     @ws.namespace('main') nspMain: Server,
+    @ws.namespace('chat') nspChat: Server,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const roomInfo = await this.hobbyRoomRepository.findById(roomId);
@@ -342,6 +386,7 @@ export class HobbyRoomController {
       memberJoinStatus: roomInfo.roomNeedAllow ? RoomMemberJoinType.REQUEST_RECV : RoomMemberJoinType.REQUEST_ALLOW,
       memberIsAllow: !roomInfo.roomNeedAllow,
     });
+    let isJoinSuccess = true;
     if (roomInfo.roomNeedAllow) {
       await this.notificationRepository.create({
         notificationSendUserId: currentUser.userId,
@@ -351,12 +396,22 @@ export class HobbyRoomController {
         notificationServiceType: ServiceType.HOBBY,
         notificationDesc: roomId,
       });
+      isJoinSuccess = false;
       nspMain.to(roomInfo.userId).emit(MainSocketMsgType.SRV_NOTIFICATION, {
         title: '취미방 가입신청',
         msg: `${hobbyProfile?.hobbyNickname}님이 ${roomInfo.roomTitle}방에 가입신청을 했습니다.`,
         icon: roomInfo.roomPhotoMain,
       });
     }
+    if(isJoinSuccess) {
+      nspChat.to(roomId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
+        id: uuidv4(),
+        type: 'system',
+        content: hobbyProfile?.hobbyNickname + '님이 모임에 가입했습니다.',
+        chatInfo: {},
+      });
+    }
+    return {isJoinSuccess};
   }
 
   @post('/hobby-rooms/{roomId}/question')
@@ -435,19 +490,29 @@ export class HobbyRoomController {
     @param.path.string('roomId') roomId: string,
     @requestBody() data: {memberId: string, type: RoomMemberJoinType},
     @ws.namespace('main') nspMain: Server,
+    @ws.namespace('chat') nspChat: Server,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const hobbyProfile = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
     const roomInfo = await this.hobbyRoomRepository.findById(roomId);
     if (roomInfo.userId !== currentUser.userId && (data.type === RoomMemberJoinType.REQUEST_ALLOW || data.type === RoomMemberJoinType.REQUEST_REJECT)) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
-    const memberInfo = await this.hobbyRoomMemberRepository.findById(data.memberId);
+    const memberInfo = await (data.memberId ? this.hobbyRoomMemberRepository.findById(data.memberId) : this.hobbyRoomMemberRepository.findOne({where: {roomId, memberUserId: currentUser.userId}}));
+    if(!memberInfo) throw new HttpErrors.BadRequest('파라미터가 정확하지 않습니다.');
     const updateData: any = {memberJoinStatus: data.type};
-    if (data.type === RoomMemberJoinType.REQUEST_ALLOW) {
+    if (data.type === RoomMemberJoinType.REQUEST_ALLOW || data.type === RoomMemberJoinType.INVITE_ALLOW) {
       updateData.memberIsAllow = true;
     }
-    await this.hobbyRoomMemberRepository.updateById(data.memberId, updateData);
+    await this.hobbyRoomMemberRepository.updateById(memberInfo.id, updateData);
     const memberCount = await this.hobbyRoomMemberRepository.count({roomId, memberIsAllow: true});
     await this.hobbyRoomRepository.updateById(roomId, {roomMemberNumber: memberCount.count});
+    if(updateData.memberIsAllow) {
+      nspChat.to(roomId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
+        id: uuidv4(),
+        type: 'system',
+        content: hobbyProfile?.hobbyNickname + '님이 모임에 가입했습니다.',
+        chatInfo: {},
+      });
+    }
 
     let notificationMsg = '', receiveUserId = '', notificationType = NotificationType.ROOM_REQUEST_ALLOW;
     if (data.type === RoomMemberJoinType.REQUEST_ALLOW) {

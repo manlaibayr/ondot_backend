@@ -158,7 +158,8 @@ export class MeetingProfileController {
     @param.path.string('id') id: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const otherProfile = await this.meetingProfileRepository.findById(id);
+    let otherProfile = await this.meetingProfileRepository.findOne({where: {userId: id}});
+    if(!otherProfile) otherProfile = await this.meetingProfileRepository.findById(id);
     const likeInfo = await this.likeRepository.findOne({where: {likeUserId: currentUser.userId, likeOtherUserId: otherProfile.userId, likeServiceType: ServiceType.MEETING}});
     const meetingChatList = await this.meetingChatListRepository.findOne(
       {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}]}}
@@ -170,6 +171,9 @@ export class MeetingProfileController {
     data.isChat = !!meetingChatList;
     data.isGiveRating = ratingCount.count > 0;
     data.isBlock = !!blockInfo;
+    if(otherProfile.meetingJobHide) {
+      data.meetingJob = '비공개';
+    }
     const visitInfo = await this.visitRepository.findOne({where: {visitUserId: currentUser.userId, visitOtherUserId: otherProfile.userId, visitServiceType: ServiceType.MEETING}});
     if(visitInfo) {
       await this.visitRepository.updateById(visitInfo.id, {visitLastTime: new Date()});

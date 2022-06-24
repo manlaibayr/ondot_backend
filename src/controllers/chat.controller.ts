@@ -2,7 +2,7 @@ import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {repository} from '@loopback/repository';
-import {get, HttpErrors, param} from '@loopback/rest';
+import {get, HttpErrors, param, post, Request, requestBody, Response, RestBindings} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {
   ChatContactRepository,
@@ -12,10 +12,13 @@ import {
   MeetingProfileRepository,
   NotificationRepository
 } from '../repositories';
-import {ChatMsgStatus, ChatSocketMsgType, ContactStatus, MainSocketMsgType, UserCredentials} from '../types';
+import {ChatMsgStatus, ChatMsgType, ChatSocketMsgType, ContactStatus, FileUploadHandler, MainSocketMsgType, UserCredentials} from '../types';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace, Server} from 'socket.io';
 import {ChatContact} from '../models';
+import moment from 'moment';
+import {Utils} from '../utils';
+import {FILE_UPLOAD_SERVICE} from '../keys';
 
 export class ChatController {
   constructor(
@@ -26,6 +29,7 @@ export class ChatController {
     @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
     @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
+    @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
   }
 
@@ -100,7 +104,7 @@ export class ChatController {
         ...v,
         nickname: findObj?.meetingNickname,
         profile: findObj?.meetingPhotoMain,
-        lastMsg: lastChat?.msgContent,
+        lastMsg: lastChat?.msgType === ChatMsgType.TEXT ? lastChat?.msgContent : lastChat?.msgType,
         unreadCount: unReadCount.count,
         isOnline: onlineUserIds.indexOf(v.otherUserId) !== -1,
       });
@@ -112,7 +116,26 @@ export class ChatController {
       roomRegion: r.hobbyRoom?.roomRegion,
       roomMemberNumber: r.hobbyRoom?.roomMemberNumber,
       roomPhotoMain: r.hobbyRoom?.roomPhotoMain,
+      isRoomDelete: r.hobbyRoom?.isRoomDelete,
     }));
     return {meeting: meetingContacts, hobby: hobbyContacts};
+  }
+
+  @post('/chats/upload-file')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async uploadFile(
+    @requestBody.file() request: Request,
+    @inject(RestBindings.Http.RESPONSE) resp: Response,
+  ) {
+    const uploadPath: string = 'chat/' + moment().format('YYYYMM');
+    const uploadFiles = await new Promise<any[]>((resolve, reject) => {
+      this.fileUploadHandler(request, resp, (err: unknown) => {
+        if (err) reject(err);
+        else {
+          resolve(Utils.getFilesAndFields(request, uploadPath));
+        }
+      });
+    });
+    return uploadFiles.map((v) => v.urlPath).join(',');
   }
 }
