@@ -1,18 +1,16 @@
 import {BootMixin} from '@loopback/boot';
-import {ApplicationConfig} from '@loopback/core';
-import {
-  RestExplorerBindings,
-  RestExplorerComponent,
-} from '@loopback/rest-explorer';
+import {ApplicationConfig, createBindingFromClass} from '@loopback/core';
+import { RestExplorerBindings, RestExplorerComponent} from '@loopback/rest-explorer';
 import {RepositoryMixin} from '@loopback/repository';
 import {ServiceMixin} from '@loopback/service-proxy';
 import {AuthenticationBindings} from '@loopback/authentication';
 import path from 'path';
 import {MySequence} from './sequence';
 import {MyAuthMetadataProvider, MyAuthAuthenticationStrategyProvider, MyAuthActionProvider, MyAuthBindings} from './role-authentication';
-import {RestApplication, RestBindings} from '@loopback/rest';
+import {RestBindings} from '@loopback/rest';
 import { WebsocketApplication } from "./websockets/websocket.application";
 import { WebsocketControllerBooter } from "./websockets/websocket.booter";
+import {initCronJob} from './services/cronJob';
 
 export {ApplicationConfig};
 
@@ -36,6 +34,9 @@ export class PowerApiApplication extends BootMixin(
       path: '/explorer',
     });
     this.component(RestExplorerComponent);
+
+    // start cronjob
+    initCronJob(this);
 
     // Set up authentication
     this.bind(AuthenticationBindings.METADATA).toProvider(MyAuthMetadataProvider);

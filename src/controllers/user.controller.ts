@@ -221,6 +221,7 @@ export class UserController {
       username: userInfo.username,
       email: userInfo.email,
       age: userInfo.age,
+      phoneNumber: userInfo.phoneNumber,
       userFlower: userInfo.userFlower,
       profile: {
         meeting: profileMeeting,

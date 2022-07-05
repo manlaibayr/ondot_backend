@@ -29,3 +29,7 @@ export * from './hobby-room-question.repository';
 export * from './chat-group-msg.repository';
 export * from './hobby-room-dibs.repository';
 export * from './ranking-user.repository';
+export * from './charge-history.repository';
+export * from './gift-goods.repository';
+export * from './gift-history.repository';
+export * from './usage-pass.repository';

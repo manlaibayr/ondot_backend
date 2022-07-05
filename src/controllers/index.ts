@@ -20,3 +20,5 @@ export * from './block.controller';
 export * from './hobby-profile.controller';
 export * from './hobby-room.controller';
 export * from './ranking-user.controller';
+export * from './charge-history.controller';
+export * from './gift-goods.controller';

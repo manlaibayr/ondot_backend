@@ -15,11 +15,13 @@ import {
   LikeRepository,
   MeetingProfileRepository,
   RatingRepository,
+  UsagePassRepository,
   UserRepository,
   VisitRepository,
 } from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
 import {Utils} from '../utils';
+import {FlowerController} from './flower.controller';
 
 export class MeetingProfileController {
   constructor(
@@ -32,8 +34,10 @@ export class MeetingProfileController {
     @repository(BlockUserRepository) public blockUserRepository: BlockUserRepository,
     @repository(BlockPhoneRepository) public blockPhoneRepository: BlockPhoneRepository,
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
+    @repository(UsagePassRepository) public usagePassRepository: UsagePassRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
+    @inject(`controllers.FlowerController`) private flowerController: FlowerController
   ) {
   }
 
@@ -174,6 +178,7 @@ export class MeetingProfileController {
     if(otherProfile.meetingJobHide) {
       data.meetingJob = '비공개';
     }
+    data.hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
     const visitInfo = await this.visitRepository.findOne({where: {visitUserId: currentUser.userId, visitOtherUserId: otherProfile.userId, visitServiceType: ServiceType.MEETING}});
     if(visitInfo) {
       await this.visitRepository.updateById(visitInfo.id, {visitLastTime: new Date()});

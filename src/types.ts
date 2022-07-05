@@ -59,7 +59,8 @@ export enum ChatMsgStatus {
 export enum ChatMsgType {
   TEXT = 'text',
   IMAGE = 'image',
-  VOICE = 'voice'
+  VOICE = 'voice',
+  SYSTEM = 'system',
 }
 
 export enum AdType {
@@ -103,6 +104,7 @@ export enum NotificationType {
   ROOM_INVITE_ALLOW = 'ROOM_INVITE_ALLOW',
   ROOM_INVITE_REJECT = 'ROOM_INVITE_REJECT',
   ROOM_KICK = 'ROOM_KICK',
+  SENT_GIFTING = 'SENT_GIFTING',
 }
 
 export enum RoomRoleType {
@@ -118,6 +120,8 @@ export enum RoomMemberJoinType {
   REQUEST_RECV = 'REQUEST_RECV',
   REQUEST_REJECT = 'REQUEST_REJECT',
   REQUEST_ALLOW = 'REQUEST_ALLOW',
+  'KICK' = 'KICK',
+  'LEAVE' = 'LEAVE',
 }
 
 export enum ChatType {

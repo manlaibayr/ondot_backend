@@ -8,6 +8,7 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace} from 'socket.io';
+import {FlowerController} from './flower.controller';
 
 export class NoteController {
   constructor(
@@ -17,6 +18,7 @@ export class NoteController {
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
+    @inject(`controllers.FlowerController`) private flowerController: FlowerController
   ) {}
 
   @get('/notes/{id}')
@@ -39,17 +41,20 @@ export class NoteController {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const noteFlower = 2;
     const myInfo = await this.userRepository.findById(currentUser.userId);
-    if(myInfo.userFlower < noteFlower) {
+    const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
+    if(!hasMeetingPass && myInfo.userFlower < noteFlower) {
       throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
     }
     const meMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: data.otherId}});
-    await this.userRepository.updateById(currentUser.userId, {userFlower: myInfo.userFlower - noteFlower});
-    await this.flowerHistoryRepository.create({
-      flowerUserId: currentUser.userId,
-      flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 쪽지를 보냈습니다.',
-      flowerValue: -noteFlower,
-    });
+    if(!hasMeetingPass) {
+      await this.userRepository.updateById(currentUser.userId, {userFlower: myInfo.userFlower - noteFlower});
+      await this.flowerHistoryRepository.create({
+        flowerUserId: currentUser.userId,
+        flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 쪽지를 보냈습니다.',
+        flowerValue: -noteFlower,
+      });
+    }
     const noteInfo = await this.noteRepository.create({
       noteUserId: currentUser.userId,
       noteOtherUserId: data.otherId,

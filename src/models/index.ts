@@ -29,3 +29,7 @@ export * from './hobby-room-question.model';
 export * from './chat-group-msg.model';
 export * from './hobby-room-dibs.model';
 export * from './ranking-user.model';
+export * from './charge-history.model';
+export * from './gift-goods.model';
+export * from './gift-history.model';
+export * from './usage-pass.model';

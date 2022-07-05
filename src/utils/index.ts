@@ -4,8 +4,10 @@ import {
 import fs from 'fs-extra';
 import path from 'path';
 import urlJoin from 'url-join';
-import {CONFIG} from '../config';
 import moment from 'moment';
+import {CONFIG} from '../config';
+import CryptoJs from 'crypto-js';
+import * as crypto from "crypto";
 
 
 export class Utils {
@@ -53,5 +55,31 @@ export class Utils {
     }
     return [moment(`${year}-${month}-01`).startOf('month').toDate(), moment(`${year}-${month}-01`).endOf('month').toDate()];
   }
+
+  public static aes256Enc(planStr: string): string {
+    const key = CryptoJs.enc.Utf8.parse(CONFIG.gifting.aesKey);
+    const iv = CryptoJs.enc.Utf8.parse(CONFIG.gifting.aesIv);
+    const encStr = CryptoJs.AES.encrypt(planStr, key, {iv: iv}).toString();
+    return encStr;
+  }
+
+  public static aes256Dnc(encStr: string): string {
+    const key = CryptoJs.enc.Utf8.parse(CONFIG.gifting.aesKey);
+    const iv = CryptoJs.enc.Utf8.parse(CONFIG.gifting.aesIv);
+    const planStr = JSON.parse(CryptoJs.AES.decrypt(encStr, key, {iv: iv}).toString(CryptoJs.enc.Latin1));
+    return planStr;
+  }
+
+  public static rsaEnc(planStr: string): string {
+    const encrypted = crypto.publicEncrypt({key: CONFIG.gifting.rsaPublicKey, padding: crypto.constants.RSA_PKCS1_PADDING}, Buffer.from(planStr));
+    return encrypted.toString("base64");
+  }
+
+  public static rsaDnc(encStr: string): string {
+    const decrypted = crypto.privateDecrypt({key: CONFIG.gifting.rsaPrivateKey, padding: crypto.constants.RSA_PKCS1_PADDING}, Buffer.from(encStr, "base64"));
+    return decrypted.toString("utf8");
+  }
+
+
 
 }

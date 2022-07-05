@@ -106,7 +106,7 @@ export class ChatControllerWs {
           const previousChat = previousChatList.map((v) => ({
             id: v.id,
             type: v.msgType,
-            content: v.msgType === ChatMsgType.TEXT ? v.msgContent : JSON.parse(v.msgContent ?? '{}'),
+            content: (v.msgType === ChatMsgType.TEXT || v.msgType === ChatMsgType.SYSTEM) ? v.msgContent : JSON.parse(v.msgContent ?? '{}'),
             targetId: v.senderUserId,
             chatInfo: {
               avatar: this.otherInfo.profile,
@@ -131,7 +131,7 @@ export class ChatControllerWs {
           const previousChat: any[] = previousChatList.map((v) => ({
             id: v.id,
             type: v.groupMsgType,
-            content: v.groupMsgType === ChatMsgType.TEXT ? v.groupMsgContent : JSON.parse(v.groupMsgContent ?? '{}'),
+            content: (v.groupMsgType === ChatMsgType.TEXT || v.groupMsgType === ChatMsgType.SYSTEM) ? v.groupMsgContent : JSON.parse(v.groupMsgContent ?? '{}'),
             targetId: v.groupSenderUserId,
             chatInfo: {
               avatar: v.hobbyProfile?.hobbyPhoto,
@@ -143,7 +143,7 @@ export class ChatControllerWs {
             time: moment(v.createdAt).unix() * 1000,
           }));
           const hobbyRoomInfo = await this.hobbyRoomRepository.findById(this.chatContactId);
-          result = {meProfile: this.meInfo, previousChat, isRoomDelete: hobbyRoomInfo.isRoomDelete};
+          result = {meProfile: {...this.meInfo, isRoomAdmin: this.meInfo.id === hobbyRoomInfo.userId}, previousChat, isRoomDelete: hobbyRoomInfo.isRoomDelete};
         } else {
           throw new HttpErrors.BadRequest('잘못된 요청입니다.');
         }

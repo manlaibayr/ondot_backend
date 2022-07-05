@@ -8,6 +8,7 @@ import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, Me
 import {ContactStatus, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
 import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
+import {FlowerController} from './flower.controller';
 
 export class MeetingController {
   constructor(
@@ -18,6 +19,7 @@ export class MeetingController {
     @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
     @repository(BlockPhoneRepository) public blockPhoneRepository: BlockPhoneRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
+    @inject(`controllers.FlowerController`) private flowerController: FlowerController
   ) {
   }
 
@@ -61,18 +63,22 @@ export class MeetingController {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const requestFlower = 3;
     const myInfo = await this.userRepository.findById(currentUser.userId);
-    if (myInfo.userFlower < requestFlower) {
+
+    const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
+    if (!hasMeetingPass && myInfo.userFlower < requestFlower) {
       throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
     }
     const myMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: userId}});
-    await this.userRepository.updateById(currentUser.userId, {userFlower: myInfo.userFlower - requestFlower});
-    await this.flowerHistoryRepository.create({
-      flowerUserId: currentUser.userId,
-      flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 대화신청',
-      flowerValue: -requestFlower,
-    });
-    const notificationInfo = await this.notificationRepository.create({
+    if(!hasMeetingPass) {
+      await this.userRepository.updateById(currentUser.userId, {userFlower: myInfo.userFlower - requestFlower});
+      await this.flowerHistoryRepository.create({
+        flowerUserId: currentUser.userId,
+        flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 대화신청',
+        flowerValue: -requestFlower,
+      });
+    }
+    await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: userId,
       notificationMsg: myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.',
