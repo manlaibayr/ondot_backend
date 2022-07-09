@@ -105,6 +105,7 @@ export enum NotificationType {
   ROOM_INVITE_REJECT = 'ROOM_INVITE_REJECT',
   ROOM_KICK = 'ROOM_KICK',
   SENT_GIFTING = 'SENT_GIFTING',
+  NORMAL = 'NORMAL',
 }
 
 export enum RoomRoleType {
@@ -120,12 +121,14 @@ export enum RoomMemberJoinType {
   REQUEST_RECV = 'REQUEST_RECV',
   REQUEST_REJECT = 'REQUEST_REJECT',
   REQUEST_ALLOW = 'REQUEST_ALLOW',
-  'KICK' = 'KICK',
-  'LEAVE' = 'LEAVE',
+  KICK = 'KICK',
+  LEAVE = 'LEAVE',
 }
 
 export enum ChatType {
   MEETING_CHAT = 'MEETING_CHAT',
+  LEARNING_CHAT = 'LEARNING_CHAT',
+  HOBBY_CHAT = 'HOBBY_CHAT',
   HOBBY_ROOM_CHAT = 'HOBBY_ROOM_CHAT'
 }
 

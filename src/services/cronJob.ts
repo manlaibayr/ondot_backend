@@ -1,18 +1,22 @@
 import {createBindingFromClass, inject} from '@loopback/core';
 import { RestApplication } from '@loopback/rest';
 import {CronComponent, CronJob, cronJob} from '@loopback/cron';
-import {ChargeHistoryController, GiftGoodsController} from '../controllers';
-import {GiftGoodsRepository} from '../repositories';
+import {GiftGoodsController} from '../controllers';
+import {HobbyRoomRepository} from '../repositories';
+import {repository} from '@loopback/repository';
 
 @cronJob()
-class GiftingGoodsCronJob extends CronJob {
+class EveryDayCronJob extends CronJob {
   constructor(
+    @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
     @inject(`controllers.GiftGoodsController`) giftGoodsController: GiftGoodsController
   ) {
     super({
       name: 'statistic-job',
       onTick: async () => {
-        await giftGoodsController.getListFromGifting()
+        await giftGoodsController.getListFromGifting();
+        // 취미방 완료날짜 처리
+        await this.hobbyRoomRepository.updateAll({isRoomDelete: true}, {isRoomDelete: false, roomExpiredDate : {lt: new Date()}});
       },
       cronTime: '0 0 0 * * *',
       start: true,
@@ -36,7 +40,7 @@ class MyCronJob1 extends CronJob {
 }
 
 export function initCronJob(app: RestApplication) {
-  // app.component(CronComponent);
-  // app.add(createBindingFromClass(GiftingGoodsCronJob));
+  app.component(CronComponent);
+  app.add(createBindingFromClass(EveryDayCronJob));
   // app.add(createBindingFromClass(MyCronJob1));
 }

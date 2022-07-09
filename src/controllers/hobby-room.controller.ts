@@ -242,6 +242,7 @@ export class HobbyRoomController {
       updateAt: m.updatedAt,
       isRoomCreator: m.hobbyProfile?.userId === roomInfo.userId,
     }));
+    const isRoomMember = members?.some((m) => m.userId === currentUser.userId);
     const invites = !isRoomAdmin ?
       members?.filter((v) => (v.memberJoinStatus === RoomMemberJoinType.INVITE_SEND && v.userId === currentUser.userId)) :
       members?.filter((v) => {
@@ -259,7 +260,7 @@ export class HobbyRoomController {
     const requests = !isRoomAdmin ?
       members?.filter((v) => (v.memberJoinStatus === RoomMemberJoinType.REQUEST_RECV && v.userId === currentUser.userId)) :
       members?.filter((v) => (v.memberJoinStatus === RoomMemberJoinType.REQUEST_RECV || v.memberJoinStatus === RoomMemberJoinType.REQUEST_REJECT));
-    const allows = members?.filter((v) => v.memberIsAllow);
+    const allows = isRoomMember ? members?.filter((v) => v.memberIsAllow) : [];
     return {invites: invites ?? [], requests: requests ?? [], allows: allows ?? [], isRoomAdmin};
   }
 
@@ -268,6 +269,7 @@ export class HobbyRoomController {
   async hobbyRoomRemoveMember(
     @param.path.string('roomId') roomId: string,
     @param.query.string('userId') userId: string,
+    @ws.namespace('main') nspMain: Server,
     @ws.namespace('chat') nspChat: Server,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
@@ -292,11 +294,17 @@ export class HobbyRoomController {
       notificationServiceType: ServiceType.HOBBY,
       notificationDesc: roomId,
     });
+
     nspChat.to(roomId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
       id: uuidv4(),
       type: ChatMsgType.SYSTEM,
       content: removeUserInfo?.hobbyNickname + '님이 탈퇴되었습니다.',
       chatInfo: {},
+    });
+    nspMain.to(userId).emit(MainSocketMsgType.SRV_NOTIFICATION, {
+      title: `취미방 강퇴`,
+      msg: `${roomInfo.roomTitle}모임에서 강퇴되었습니다.`,
+      icon: roomInfo.roomPhotoMain,
     });
   }
 
@@ -311,7 +319,7 @@ export class HobbyRoomController {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const roomInfo = await this.hobbyRoomRepository.findById(roomId);
     if (roomInfo.userId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
-    await this.hobbyRoomMemberRepository.updateAll({memberJoinStatus: RoomMemberJoinType.KICK}, {roomId: roomId, memberUserId: {inq: userIds}});
+    await this.hobbyRoomMemberRepository.updateAll({memberJoinStatus: RoomMemberJoinType.KICK, memberIsAllow: false}, {roomId: roomId, memberUserId: {inq: userIds}});
     const removeProfileList = await this.hobbyProfileRepository.find({where: {userId: {inq: userIds}}});
     const memberNumber = await this.hobbyRoomMemberRepository.count({roomId: roomId, memberIsAllow: true});
     await this.hobbyRoomRepository.updateById(roomId, {roomMemberNumber: memberNumber.count});
@@ -332,6 +340,17 @@ export class HobbyRoomController {
         notificationDesc: roomId,
       })),
     );
+    // 강퇴시킨 회원들을 방에서 추방
+    try {
+      for (const socketId in nspChat.sockets) {
+        const socketList: any = nspChat.sockets;
+        if (Object.keys(socketList[socketId].rooms).filter((r: any) => userIds.some((u) => r === u)).length > 0) {
+          socketList[socketId].disconnect();
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
     nspChat.to(roomId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, {
       id: uuidv4(),
       type: ChatMsgType.SYSTEM,
@@ -594,6 +613,48 @@ export class HobbyRoomController {
     } else {
       await this.hobbyRoomDibsRepository.deleteById(info.id);
     }
+  }
+
+  @get('/hobby-rooms/{roomId}/cancel-del')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomCancelDel(
+    @param.path.string('roomId') roomId: string,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
+    if (roomInfo.userId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    if(roomInfo.isRoomDelete && moment(roomInfo.roomExpiredDate) > moment()) {
+      await this.hobbyRoomRepository.updateById(roomId, {isRoomDelete: false});
+    } else {
+      throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    }
+  }
+
+  @get('/hobby-rooms/{roomId}/repurchase')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRoomRepurchase(
+    @param.path.string('roomId') roomId: string,
+    @param.query.number('month') month: 1 | 3 | 6 | 12,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const roomInfo = await this.hobbyRoomRepository.findById(roomId);
+    if (roomInfo.userId !== currentUser.userId) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    if(moment(roomInfo.roomExpiredDate) > moment()) throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    const needFlower = {1: 500, 3: 1000, 6: 2000, 12: 4000}[month];
+    if (!needFlower) {
+      throw new HttpErrors.BadRequest('잘못된 요청입니다.');
+    }
+    if (needFlower > currentUser.userFlower) {
+      throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
+    }
+    const roomExpiredDate = moment().add(month, 'months').toDate();
+    await this.hobbyRoomRepository.updateById(roomId, {isRoomDelete: false, roomExpiredDate});
+    await this.flowerHistoryRepository.create({
+      flowerUserId: currentUser.userId,
+      flowerContent: roomInfo.roomTitle + ' 취미 방 재개설',
+      flowerValue: -needFlower,
+    });
+    await this.userRepository.updateById(currentUser.userId, {userFlower: currentUser.userFlower - needFlower});
   }
 
 }

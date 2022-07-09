@@ -5,7 +5,7 @@ import {UserProfile} from '@loopback/security';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
-import {ContactStatus, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
+import {ChatType, ContactStatus, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
 import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {FlowerController} from './flower.controller';
@@ -107,6 +107,7 @@ export class MeetingController {
       callUserName: myMeetingInfo?.meetingNickname,
       callUserProfile: myMeetingInfo?.meetingPhotoMain,
       contactId: chatContactInfo.id,
+      chatType: ChatType.HOBBY_CHAT
     });
   }
 }

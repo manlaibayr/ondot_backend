@@ -28,7 +28,7 @@ export class MeetingProfileController {
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @repository(UserRepository) public userRepository: UserRepository,
     @repository(LikeRepository) public likeRepository : LikeRepository,
-    @repository(ChatContactRepository) public meetingChatListRepository: ChatContactRepository,
+    @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
     @repository(RatingRepository) public ratingRepository: RatingRepository,
     @repository(VisitRepository) public visitRepository: VisitRepository,
     @repository(BlockUserRepository) public blockUserRepository: BlockUserRepository,
@@ -165,12 +165,13 @@ export class MeetingProfileController {
     let otherProfile = await this.meetingProfileRepository.findOne({where: {userId: id}});
     if(!otherProfile) otherProfile = await this.meetingProfileRepository.findById(id);
     const likeInfo = await this.likeRepository.findOne({where: {likeUserId: currentUser.userId, likeOtherUserId: otherProfile.userId, likeServiceType: ServiceType.MEETING}});
-    const meetingChatList = await this.meetingChatListRepository.findOne(
+    const meetingChatList = await this.chatContactRepository.findOne(
       {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}]}}
     )
     const ratingCount = await this.ratingRepository.count({ratingUserId: currentUser.userId, ratingOtherUserId: otherProfile.userId});
     const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: otherProfile.userId, blockServiceType: ServiceType.MEETING}});
     const data: any = otherProfile.toJSON();
+    data.meetingResidence = data.meetingResidence.split(' ').slice(0,2).join(' ');
     data.isLike = !!likeInfo;
     data.isChat = !!meetingChatList;
     data.isGiveRating = ratingCount.count > 0;

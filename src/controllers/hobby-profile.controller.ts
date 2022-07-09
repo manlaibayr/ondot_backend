@@ -6,10 +6,21 @@ import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, RoomRoleType, ServiceType, UserCredentials} from '../types';
+import {ChatType, ContactStatus, FileUploadHandler, MainSocketMsgType, NotificationType, RoomRoleType, ServiceType, UserCredentials} from '../types';
 import {Utils} from '../utils';
 import {HobbyProfile} from '../models';
-import {BlockUserRepository, HobbyProfileRepository, HobbyRoomDibsRepository, HobbyRoomMemberRepository, HobbyRoomRepository, UserRepository} from '../repositories';
+import {
+  BlockUserRepository,
+  ChatContactRepository,
+  HobbyProfileRepository,
+  HobbyRoomDibsRepository,
+  HobbyRoomMemberRepository,
+  HobbyRoomRepository,
+  NotificationRepository,
+  UserRepository,
+} from '../repositories';
+import {ws} from '../websockets/decorators/websocket.decorator';
+import {Server} from 'socket.io';
 
 export class HobbyProfileController {
   constructor(
@@ -19,6 +30,8 @@ export class HobbyProfileController {
     @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @repository(HobbyRoomDibsRepository) public hobbyRoomDibsRepository: HobbyRoomDibsRepository,
     @repository(BlockUserRepository) public blockUserRepository: BlockUserRepository,
+    @repository(NotificationRepository) public notificationRepository: NotificationRepository,
+    @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
@@ -96,6 +109,7 @@ export class HobbyProfileController {
     const joinRooms = await this.hobbyRoomMemberRepository.find({where: {memberUserId: currentUser.userId, memberRole: RoomRoleType.MEMBER}, include: [{relation: 'hobbyRoom'}]});
     const createRooms = await this.hobbyRoomRepository.find({where: {userId: currentUser.userId}});
     const dibRooms = await this.hobbyRoomDibsRepository.find({where: {dibsUserId: currentUser.userId}, include: [{relation: 'hobbyRoom'}]});
+
     return {
       profile,
       joinRooms: joinRooms.map((v) => v.hobbyRoom),
@@ -111,11 +125,16 @@ export class HobbyProfileController {
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const otherProfile = await this.hobbyProfileRepository.findOne({where: {userId: userId}});
+    if(!otherProfile) throw new HttpErrors.BadRequest('존재하지 않는 회원입니다.');
     const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: otherProfile?.userId, blockServiceType: ServiceType.HOBBY}});
     const joinRooms = await this.hobbyRoomMemberRepository.find({where: {memberUserId: userId, memberRole: RoomRoleType.MEMBER}, include: [{relation: 'hobbyRoom'}]});
     const createRooms = await this.hobbyRoomRepository.find({where: {userId: userId}});
+    const hobbyChatList = await this.chatContactRepository.findOne(
+      {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: userId}, {contactUserId: userId, contactOtherUserId: currentUser.userId}]}}
+    )
+    otherProfile.hobbyResidence = otherProfile?.hobbyResidence ? otherProfile.hobbyResidence.split(' ').slice(0,2).join(' ') : '';
     return {
-      profile: {...otherProfile, isBlock: !!blockInfo},
+      profile: {...otherProfile, isBlock: !!blockInfo, isChat: !!hobbyChatList},
       joinRooms: joinRooms.map((v) => v.hobbyRoom),
       createRooms,
     }
@@ -137,5 +156,48 @@ export class HobbyProfileController {
       });
     });
     return uploadFiles.map((v) => v.urlPath).join(',');
+  }
+
+  @get('/hobby-profiles/request-chat')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async hobbyRequestChat(
+    @ws.namespace('main') nspMain: Server,
+    @param.query.string('userId') userId: string,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+
+    const myHobbyInfo = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
+    const otherUserHobbyInfo = await this.hobbyProfileRepository.findOne({where: {userId: userId}});
+    await this.notificationRepository.create({
+      notificationSendUserId: currentUser.userId,
+      notificationReceiveUserId: userId,
+      notificationMsg: myHobbyInfo?.hobbyNickname + '님이 대화신청을 보냈습니다.',
+      notificationType: NotificationType.NORMAL,
+      notificationServiceType: ServiceType.HOBBY,
+    });
+    let chatContactInfo = await this.chatContactRepository.findOne({
+      where: {
+        or: [
+          {contactUserId: currentUser.userId, contactOtherUserId: userId, contactServiceType: ServiceType.HOBBY},
+          {contactUserId: userId, contactOtherUserId: currentUser.userId, contactServiceType: ServiceType.HOBBY}
+        ],
+      },
+    });
+    if (!chatContactInfo) {
+      chatContactInfo = await this.chatContactRepository.create({
+        contactUserId: currentUser.userId,
+        contactOtherUserId: userId,
+        contactStatus: ContactStatus.ALLOW,
+        contactOtherStatus: ContactStatus.ALLOW,
+        contactServiceType: ServiceType.HOBBY
+      });
+    }
+    nspMain.to(userId).emit(MainSocketMsgType.SRV_REQUEST_CHAT, {
+      callUserId: currentUser.userId,
+      callUserName: myHobbyInfo?.hobbyNickname,
+      callUserProfile: myHobbyInfo?.hobbyPhoto,
+      contactId: chatContactInfo.id,
+      chatType: ChatType.HOBBY_CHAT
+    });
   }
 }
