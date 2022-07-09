@@ -1,14 +1,14 @@
-import {get, HttpErrors, param} from '@loopback/rest';
-import {Filter, repository} from '@loopback/repository';
+import {get, HttpErrors, param, response} from '@loopback/rest';
+import {Count, Filter, repository} from '@loopback/repository';
 import axios from 'axios';
 import iconv from 'iconv-lite';
 import {v4 as uuidv4} from 'uuid';
 import {Utils} from '../utils';
 import {CONFIG} from '../config';
 import {FlowerHistoryRepository, GiftGoodsRepository, GiftHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
-import {GiftGoods} from '../models';
+import {GiftGoods, GiftHistory, GiftHistoryWithRelations, User, UserWithRelations} from '../models';
 import {secured, SecuredType} from '../role-authentication';
-import {MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
+import {MainSocketMsgType, NotificationType, ServiceType, UserCredentials, UserStatusType} from '../types';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
@@ -57,7 +57,6 @@ export class GiftGoodsController {
   @get('/gift-goods/get-list-from-gifting')
   public async getListFromGifting() {
     try {
-      // const token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbklkIjoibXl1NEZlQmVuUEdnMy9DZGJqOWF3eTJ5UWFIZWtoVVA3emVhcVdsRS9pM0RvSzJLdm5zbVVkdHBOUVNac3BtcEE2VDVpUU9XK3ZXLytXeGEyTC9XL0NLdGNRZWQ0bE9OdkdzdDc3TjRYQXc9Iiwic2lnbmF0dXJlIjoiSERubHE0MXgyQUVKTS9oVXFwTEpIUT09In0.ontUStgyQ_85d4JOhWhyxb7zEzAGnhWwhFWuloBbfVc';
       const token = await this.getGiftingToken();
       const params = new URLSearchParams({
         mdcode: CONFIG.gifting.mdCode,
@@ -102,8 +101,9 @@ export class GiftGoodsController {
     @param.query.number('page') page: number,
   ) {
     const filter: Filter<GiftGoods> = {};
+    filter.order = ['affiliate_category asc'];
     filter.skip = (page - 1) * CONFIG.pageLimit;
-    filter.limit = 50;
+    filter.limit = 150;
     const list = await this.giftGoodsRepository.find(filter);
     return list.map((v) => ({
       goods_id: v.goods_id,
@@ -111,7 +111,7 @@ export class GiftGoodsController {
       goods_img: v.goods_img,
       affiliate_category: v.affiliate_category,
       desc: v.desc,
-      goods_flower: v.total_price ? (v.total_price / 10) : 0,
+      goods_flower: v.total_price ? Math.ceil(v.total_price / 10) : 0,
     }));
   }
 
@@ -132,8 +132,8 @@ export class GiftGoodsController {
     ]);
 
     if (!giftingInfo.total_price) throw new HttpErrors.BadRequest('선물이 정확하지 않습니다.');
-    const giftingFlower = giftingInfo.total_price / 10;
-    if (giftingFlower > userInfo.userFlower) throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
+    const giftingFlower = Math.ceil(giftingInfo.total_price / 10);
+    if (giftingFlower > userInfo.payFlower) throw new HttpErrors.BadRequest('유료플라워가 충분하지 않습니다.');
 
     const giftHistoryId = uuidv4();
     const token = await this.getGiftingToken();
@@ -157,9 +157,9 @@ export class GiftGoodsController {
     }
 
     await Promise.all([
-      this.userRepository.updateById(currentUser.userId, {userFlower: userInfo.userFlower - giftingFlower}),
+      this.userRepository.updateById(currentUser.userId, {payFlower: userInfo.payFlower - giftingFlower}),
       this.flowerHistoryRepository.create(
-        {flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함', flowerValue: -giftingFlower},
+        {flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함', flowerValue: -giftingFlower, isFreeFlower: false},
       ),
       this.notificationRepository.create({
         notificationSendUserId: currentUser.userId,
@@ -185,6 +185,38 @@ export class GiftGoodsController {
       msg: userMeetingProfile?.meetingNickname + `님에게서 선물(${giftingInfo.goods_nm})을 받았습니다.`,
       icon: userMeetingProfile?.meetingPhotoMain,
     });
-    return {userFlower: userInfo.userFlower - giftingFlower};
+    return {payFlower: userInfo.payFlower - giftingFlower};
   }
+
+  //*========== admin functions ==========*//
+  @get('/gift-goods/admin-list')
+  @secured(SecuredType.HAS_ROLES, ['ADMIN'])
+  async adminGiftingList(
+    @param.query.number('page') page: number,
+    @param.query.number('count') pageCount: number,
+    @param.query.object('search') searchParam?: {text?: string, signupType?: string, userStatus?: UserStatusType},
+    @param.query.object('sort') sortParam?: {field: string, asc: boolean},
+  ) {
+    if (page < 1) throw new HttpErrors.BadRequest('param is not correct');
+    const filter: Filter<GiftHistory> = {};
+    filter.where = {};
+    const totalCount: Count = await this.giftHistoryRepository.count(filter.where);
+    filter.skip = (page - 1) * pageCount;
+    filter.limit = pageCount;
+    filter.include = [{relation: 'senderUser', scope: {fields: ['id', 'username']}}, {relation: 'receiverUser', scope: {fields: ['id', 'username']}}];
+    if (sortParam?.field) {
+      filter.order = [sortParam.field + ' ' + (sortParam.asc ? 'asc' : 'desc')];
+    }
+    const data: GiftHistoryWithRelations[] = await this.giftHistoryRepository.find(filter);
+    return {
+      meta: {
+        currentPage: page,
+        itemsPerPage: pageCount,
+        totalItemCount: totalCount.count,
+        totalPageCount: Math.ceil(totalCount.count / pageCount),
+      },
+      data,
+    };
+  }
+
 }

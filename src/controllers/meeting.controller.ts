@@ -5,10 +5,11 @@ import {UserProfile} from '@loopback/security';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
-import {ContactStatus, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
+import {ChatType, ContactStatus, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
 import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {FlowerController} from './flower.controller';
+import {Utils} from '../utils';
 
 export class MeetingController {
   constructor(
@@ -36,6 +37,8 @@ export class MeetingController {
     const i = userList.findIndex((v) => v.userId === currentUser.userId);
     const myProfile = i !== -1 ? userList.splice(i, 1)[0] : null;
     const profileList: any = [];
+    // 인기순
+
     // 접속한 회원 리스트
     const rooms: any = nspMain.adapter.rooms;
     const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
@@ -47,9 +50,9 @@ export class MeetingController {
 
     const data = {
       meetingProfile: myProfile,
-      popularList: profileList.splice(0, 5),
-      nearList: profileList.splice(5, 10),
-      matchList: profileList.splice(15, 10),
+      popularList: profileList.splice(0, 15),
+      nearList: profileList.splice(15, 25),
+      matchList: profileList.splice(26, 31),
     };
     return data;
   }
@@ -62,21 +65,22 @@ export class MeetingController {
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const requestFlower = 3;
-    const myInfo = await this.userRepository.findById(currentUser.userId);
 
     const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
-    if (!hasMeetingPass && myInfo.userFlower < requestFlower) {
+    if (!hasMeetingPass && (currentUser.payFlower + currentUser.freeFlower) < requestFlower) {
       throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
     }
     const myMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: userId}});
     if(!hasMeetingPass) {
-      await this.userRepository.updateById(currentUser.userId, {userFlower: myInfo.userFlower - requestFlower});
-      await this.flowerHistoryRepository.create({
+      const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, requestFlower);
+      await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
+      await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
         flowerUserId: currentUser.userId,
         flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 대화신청',
-        flowerValue: -requestFlower,
-      });
+        flowerValue: v.flowerValue,
+        isFreeFlower: v.isFreeFlower
+      })));
     }
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
@@ -107,6 +111,7 @@ export class MeetingController {
       callUserName: myMeetingInfo?.meetingNickname,
       callUserProfile: myMeetingInfo?.meetingPhotoMain,
       contactId: chatContactInfo.id,
+      chatType: ChatType.HOBBY_CHAT
     });
   }
 }

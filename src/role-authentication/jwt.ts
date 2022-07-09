@@ -130,19 +130,20 @@ export class MyAuthAuthenticationStrategyProvider implements Provider<Authentica
     done: (err: Error | null, user?: UserProfile | false, info?: Object) => void,
   ): void {
     const {userId, username, userType, verifyToken} = payload;
-    let userFlower = 0;
+    let freeFlower = 0, payFlower = 0;
     Promise.all([
       this.userRepository.findById(userId),
       this.verifytokenRepository.findOne({where: {id: verifyToken, user_id: userId, token_valid: true}}),
     ]).then(([user, verifyTokenObj]) => {
       if (!user || !verifyTokenObj) done(null, false);
-      userFlower = user.userFlower;
+      freeFlower = user.freeFlower;
+      payFlower = user.payFlower;
       return this.verifyRoles(userId);
     }).then((result) => {
       // CURRENT_USER information structure.
       // You can add additional parameter what you call currentUser function.
       done(null, {
-        userId, username, userType, userFlower, verifyToken, [securityId]: username,
+        userId, username, userType, freeFlower, payFlower, verifyToken, [securityId]: username,
       });
     }).catch((err) => {
       done(null, false)

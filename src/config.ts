@@ -30,12 +30,15 @@ export const CONFIG = {
     secretKey: '4c82be986c0c0c45fd8619baf0a95da75f690129b247f6c8531678340e77362ab27e77087085d855',
   },
   gifting: {
-    authUrl: 'http://dev.giftting.co.kr:48081',
-    mediaUrl: 'http://dev.giftting.co.kr:8084/media',
+    // authUrl: 'http://dev.giftting.co.kr:48081',   //개발서버
+    authUrl: 'https://auth.giftting.co.kr',
+    // mediaUrl: 'http://dev.giftting.co.kr:8084/media', // 개발서버
+    mediaUrl: 'https://gw.giftting.co.kr:4431/media',
     mdCode: 'ontec',
     custId: 'ontec',
     pwd: 'zxc1234!@#$',
-    authKey: '3651ba06724d9cb3eaca19eb8f5b2309e670ef8e06b6fd7976d5c6070fe86a4e',
+    // authKey: '3651ba06724d9cb3eaca19eb8f5b2309e670ef8e06b6fd7976d5c6070fe86a4e', //개발서버
+    authKey: '9326df083e0777628132b7425468a305fae45f58668cbb3ad6c92759ea918c70',
     aesKey: 'NcRfUjXn2r5u8x/A?D(G+KbPdSgVkYp3',
     aesIv: 'MjfHe98&#jUjekq7',
     rsaPublicKey: '-----BEGIN PUBLIC KEY-----\n' +

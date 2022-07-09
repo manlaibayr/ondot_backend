@@ -9,6 +9,7 @@ import {secured, SecuredType} from '../role-authentication';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace} from 'socket.io';
 import {FlowerController} from './flower.controller';
+import {Utils} from '../utils';
 
 export class LikeController {
   constructor(
@@ -28,10 +29,9 @@ export class LikeController {
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const likeFlower = 1;
-    const myInfo = await this.userRepository.findById(currentUser.userId);
 
     const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
-    if (!hasMeetingPass && myInfo.userFlower < likeFlower) {
+    if (!hasMeetingPass && (currentUser.payFlower + currentUser.freeFlower) < likeFlower) {
       throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
     }
     const alreadyInfo = await this.likeRepository.findOne({
@@ -44,12 +44,14 @@ export class LikeController {
     if (alreadyInfo) throw new HttpErrors.BadRequest('이미 좋아요 했습니다.');
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: otherUserId}});
     if(!hasMeetingPass) {
-      await this.userRepository.updateById(currentUser.userId, {userFlower: myInfo.userFlower - likeFlower});
-      await this.flowerHistoryRepository.create({
+      const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, likeFlower);
+      await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
+      await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
         flowerUserId: currentUser.userId,
         flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 좋아요함',
-        flowerValue: -likeFlower,
-      });
+        flowerValue: v.flowerValue,
+        isFreeFlower: v.isFreeFlower
+      })))
     }
     return this.likeRepository.create({
       likeUserId: currentUser.userId,

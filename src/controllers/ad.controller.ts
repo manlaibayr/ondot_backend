@@ -45,8 +45,8 @@ export class AdController {
       this.adHistoryRepository.count({adHistoryAdId: id, adHistoryUserId: currentUser.userId})
     ]);
     if(adHistoryCount.count >= adInfo.adTryCount) throw new HttpErrors.BadRequest('플라워를 받을수 없습니다.');
-    await this.userRepository.updateById(currentUser.userId, {userFlower: userInfo.userFlower + adInfo.adFlower});
-    await this.flowerHistoryRepository.create({flowerUserId: currentUser.userId, flowerContent: '무료 충전 광고열람보상', flowerValue: adInfo.adFlower});
+    await this.userRepository.updateById(currentUser.userId, {freeFlower: userInfo.freeFlower + adInfo.adFlower});
+    await this.flowerHistoryRepository.create({flowerUserId: currentUser.userId, flowerContent: '무료 충전 광고열람보상', flowerValue: adInfo.adFlower, isFreeFlower: true});
     await this.adHistoryRepository.create({adHistoryUserId: currentUser.userId, adHistoryAdId: id, adHistoryFlower: adInfo.adFlower});
     return {flower: adInfo.adFlower};
   }

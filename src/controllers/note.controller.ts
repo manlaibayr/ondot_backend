@@ -9,6 +9,7 @@ import {UserProfile} from '@loopback/security';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace} from 'socket.io';
 import {FlowerController} from './flower.controller';
+import {Utils} from '../utils';
 
 export class NoteController {
   constructor(
@@ -40,20 +41,21 @@ export class NoteController {
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const noteFlower = 2;
-    const myInfo = await this.userRepository.findById(currentUser.userId);
     const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
-    if(!hasMeetingPass && myInfo.userFlower < noteFlower) {
+    if(!hasMeetingPass && (currentUser.payFlower + currentUser.freeFlower) < noteFlower) {
       throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
     }
     const meMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: data.otherId}});
     if(!hasMeetingPass) {
-      await this.userRepository.updateById(currentUser.userId, {userFlower: myInfo.userFlower - noteFlower});
-      await this.flowerHistoryRepository.create({
+      const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, noteFlower);
+      await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
+      await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
         flowerUserId: currentUser.userId,
         flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 쪽지를 보냈습니다.',
-        flowerValue: -noteFlower,
-      });
+        flowerValue: v.flowerValue,
+        isFreeFlower: v.isFreeFlower
+      })));
     }
     const noteInfo = await this.noteRepository.create({
       noteUserId: currentUser.userId,

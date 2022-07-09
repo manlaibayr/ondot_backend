@@ -22,13 +22,14 @@ import {
 import {secured, SecuredType} from '../role-authentication';
 import {Utils} from '../utils';
 import {FlowerController} from './flower.controller';
+import {RankingUserController} from './ranking-user.controller';
 
 export class MeetingProfileController {
   constructor(
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @repository(UserRepository) public userRepository: UserRepository,
     @repository(LikeRepository) public likeRepository : LikeRepository,
-    @repository(ChatContactRepository) public meetingChatListRepository: ChatContactRepository,
+    @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
     @repository(RatingRepository) public ratingRepository: RatingRepository,
     @repository(VisitRepository) public visitRepository: VisitRepository,
     @repository(BlockUserRepository) public blockUserRepository: BlockUserRepository,
@@ -37,7 +38,8 @@ export class MeetingProfileController {
     @repository(UsagePassRepository) public usagePassRepository: UsagePassRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
-    @inject(`controllers.FlowerController`) private flowerController: FlowerController
+    @inject(`controllers.FlowerController`) private flowerController: FlowerController,
+    @inject(`controllers.RankingUserController`) private rankingUserController: RankingUserController,
   ) {
   }
 
@@ -65,6 +67,7 @@ export class MeetingProfileController {
     const data: any = profile.toJSON();
     data.likeCount = likeCount.count;
     data.visitCount = visitCount.count;
+    data.totalFavor = await this.rankingUserController.calcUserMeetingTotalFavor(currentUser.userId);
     return data;
   }
 
@@ -105,17 +108,18 @@ export class MeetingProfileController {
     meetingProfile.userId = currentUser.userId;
     meetingProfile.age = userInfo.age;
     meetingProfile.sex = userInfo.sex ? '남성' : '여성';
-    let userFlower = userInfo.userFlower;
+    let freeFlower = currentUser.freeFlower;
     if(meetingProfile.meetingPhotoAdditional && meetingProfile.meetingPhotoAdditional.split(',').length >= 4) {
       await this.flowerHistoryRepository.create({
         flowerUserId: currentUser.userId,
         flowerContent: '미팅프로필 등록시 사진 4장을 추가하여 받음',
         flowerValue: 20,
+        isFreeFlower: true
       });
-      userFlower += 20;
+      freeFlower += 20;
     }
     const profileResult = await this.meetingProfileRepository.create(meetingProfile);
-    await this.userRepository.updateById(currentUser.userId, {meetingProfileId: profileResult.id, userFlower});
+    await this.userRepository.updateById(currentUser.userId, {meetingProfileId: profileResult.id, freeFlower});
   }
 
   @patch('/meeting-profiles')
@@ -165,16 +169,18 @@ export class MeetingProfileController {
     let otherProfile = await this.meetingProfileRepository.findOne({where: {userId: id}});
     if(!otherProfile) otherProfile = await this.meetingProfileRepository.findById(id);
     const likeInfo = await this.likeRepository.findOne({where: {likeUserId: currentUser.userId, likeOtherUserId: otherProfile.userId, likeServiceType: ServiceType.MEETING}});
-    const meetingChatList = await this.meetingChatListRepository.findOne(
-      {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}]}}
+    const meetingChatList = await this.chatContactRepository.findOne(
+      {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}], contactServiceType: ServiceType.MEETING}}
     )
     const ratingCount = await this.ratingRepository.count({ratingUserId: currentUser.userId, ratingOtherUserId: otherProfile.userId});
     const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: otherProfile.userId, blockServiceType: ServiceType.MEETING}});
     const data: any = otherProfile.toJSON();
+    data.meetingResidence = data.meetingResidence.split(' ').slice(0,2).join(' ');
     data.isLike = !!likeInfo;
     data.isChat = !!meetingChatList;
     data.isGiveRating = ratingCount.count > 0;
     data.isBlock = !!blockInfo;
+    data.totalFavor = await this.rankingUserController.calcUserMeetingTotalFavor(otherProfile.userId);
     if(otherProfile.meetingJobHide) {
       data.meetingJob = '비공개';
     }

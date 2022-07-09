@@ -12,7 +12,8 @@ export interface UserCredentials extends UserProfile {
   userId: string;
   username: string;
   userType: UserType;
-  userFlower: number;
+  freeFlower: number;
+  payFlower: number;
   verifyToken: string;
 }
 
@@ -82,6 +83,7 @@ export enum MainSocketMsgType {
   SRV_OTHER_USER_CHAT = 'SRV_OTHER_USER_CHAT',
   SRV_CHANGE_CONTACT_LIST = 'SRV_CHANGE_CONTACT_LIST',
   SRV_NOTIFICATION = 'SRV_NOTIFICATION',
+  SRV_OTHER_VOICE_REQ = 'SRV_OTHER_VOICE_REQ',
 }
 
 export enum ChatSocketMsgType {
@@ -105,6 +107,7 @@ export enum NotificationType {
   ROOM_INVITE_REJECT = 'ROOM_INVITE_REJECT',
   ROOM_KICK = 'ROOM_KICK',
   SENT_GIFTING = 'SENT_GIFTING',
+  NORMAL = 'NORMAL',
 }
 
 export enum RoomRoleType {
@@ -120,16 +123,30 @@ export enum RoomMemberJoinType {
   REQUEST_RECV = 'REQUEST_RECV',
   REQUEST_REJECT = 'REQUEST_REJECT',
   REQUEST_ALLOW = 'REQUEST_ALLOW',
-  'KICK' = 'KICK',
-  'LEAVE' = 'LEAVE',
+  KICK = 'KICK',
+  LEAVE = 'LEAVE',
 }
 
 export enum ChatType {
   MEETING_CHAT = 'MEETING_CHAT',
+  LEARNING_CHAT = 'LEARNING_CHAT',
+  HOBBY_CHAT = 'HOBBY_CHAT',
   HOBBY_ROOM_CHAT = 'HOBBY_ROOM_CHAT'
 }
 
 export enum RankingType {
-  'WEEK' = 'WEEK',
-  'MONTH' = 'MONTH'
+  WEEK = 'WEEK',  // 주 호감도 통계
+  MONTH = 'MONTH',  // 월 호감도 통계
+  MONTH_RATING = 'MONTH_RATING', // 월 별점 통계
+}
+
+export enum ChargeStatus {
+  SUCCESS = 'SUCCESS',
+  REFUND_REQUEST = 'REFUND_REQUEST',
+  REFUNDED = 'REFUNDED'
+}
+
+export enum LearningProfileType {
+  STUDENT = 'STUDENT',
+  TEACHER = 'TEACHER',
 }

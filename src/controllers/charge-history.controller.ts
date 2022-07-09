@@ -1,12 +1,12 @@
-import {Filter, FilterExcludingWhere, repository} from '@loopback/repository';
-import {post, param, get, getModelSchemaRef, requestBody, response, HttpErrors} from '@loopback/rest';
+import {FilterExcludingWhere, repository} from '@loopback/repository';
+import {get, getModelSchemaRef, HttpErrors, param, post, requestBody, response} from '@loopback/rest';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import axios from 'axios';
 import {ChargeHistory} from '../models';
 import {ChargeHistoryRepository, FlowerHistoryRepository, NotificationRepository, UserRepository} from '../repositories';
-import {UserCredentials} from '../types';
+import {ChargeStatus, UserCredentials} from '../types';
 import {secured, SecuredType} from '../role-authentication';
 import {CONFIG} from '../config';
 
@@ -50,11 +50,12 @@ export class ChargeHistoryController {
       switch (paymentData.status) {
         case 'paid':
           await Promise.all([
-            this.userRepository.updateById(currentUser.userId, {userFlower: currentUser.userFlower + Number(data.flower)}),
+            this.userRepository.updateById(currentUser.userId, {payFlower: currentUser.payFlower + Number(data.flower)}),
             this.flowerHistoryRepository.create({
               flowerUserId: currentUser.userId,
               flowerContent: `${data.flower} 충전`,
               flowerValue: data.flower,
+              isFreeFlower: false,
             }),
             this.chargeHistoryRepository.create({
               chargeUserId: currentUser.userId,
@@ -63,6 +64,7 @@ export class ChargeHistoryController {
               chargeAmount: data.amount,
               chargeFlower: data.flower,
               chargeDesc: paymentData.name,
+              chargeStatus: ChargeStatus.SUCCESS
             }),
           ])
           break;
@@ -75,24 +77,19 @@ export class ChargeHistoryController {
   }
 
   @get('/charge-histories')
-  @response(200, {
-    description: 'Array of ChargeHistory model instances',
-    content: {
-      'application/json': {
-        schema: {
-          type: 'array',
-          items: getModelSchemaRef(ChargeHistory, {includeRelations: true}),
-        },
-      },
-    },
-  })
+  @secured(SecuredType.IS_AUTHENTICATED)
   async find(
-    @param.filter(ChargeHistory) filter?: Filter<ChargeHistory>,
-  ): Promise<ChargeHistory[]> {
-    return this.chargeHistoryRepository.find(filter);
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    return this.chargeHistoryRepository.find({
+      where: {chargeUserId: currentUser.userId},
+      order: ['createdAt desc'],
+      fields: ['id', 'chargeAmount', 'chargeDesc', 'chargeFlower', 'chargeStatus', 'createdAt'],
+    });
   }
 
   @get('/charge-histories/{id}')
+  @secured(SecuredType.IS_AUTHENTICATED)
   @response(200, {
     description: 'ChargeHistory model instance',
     content: {
@@ -106,5 +103,13 @@ export class ChargeHistoryController {
     @param.filter(ChargeHistory, {exclude: 'where'}) filter?: FilterExcludingWhere<ChargeHistory>,
   ): Promise<ChargeHistory> {
     return this.chargeHistoryRepository.findById(id, filter);
+  }
+
+  @get('/charge-histories/{id}/refund-request')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async refundRequest(
+    @param.path.string('id') id: string,
+  ) {
+    await this.chargeHistoryRepository.updateById(id, {chargeStatus: ChargeStatus.REFUND_REQUEST});
   }
 }

@@ -97,7 +97,13 @@ export class User extends Entity {
     type: 'number',
     default: 1000,
   })
-  userFlower: number;
+  freeFlower: number;
+
+  @property({
+    type: 'number',
+    default: 1000,
+  })
+  payFlower: number;
 
   @property({
     type: 'string'
@@ -108,6 +114,11 @@ export class User extends Entity {
     type: 'string'
   })
   hobbyProfileId?: string;
+
+  @property({
+    type: 'string'
+  })
+  learningProfileId?: string;
 
   @property({
     type: 'string',

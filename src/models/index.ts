@@ -33,3 +33,4 @@ export * from './charge-history.model';
 export * from './gift-goods.model';
 export * from './gift-history.model';
 export * from './usage-pass.model';
+export * from './learning-profile.model';

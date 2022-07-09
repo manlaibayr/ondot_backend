@@ -27,6 +27,13 @@ export class FlowerHistory extends Entity {
   flowerValue: number;
 
   @property({
+    type: 'boolean',
+    required: true,
+    default: true,
+  })
+  isFreeFlower: boolean;
+
+  @property({
     type: 'date',
     default: "$now"
   })

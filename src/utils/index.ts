@@ -1,4 +1,5 @@
 import {
+  HttpErrors,
   Request,
 } from '@loopback/rest';
 import fs from 'fs-extra';
@@ -7,10 +8,33 @@ import urlJoin from 'url-join';
 import moment from 'moment';
 import {CONFIG} from '../config';
 import CryptoJs from 'crypto-js';
-import * as crypto from "crypto";
+import * as crypto from 'crypto';
 
 
 export class Utils {
+
+  public static calcUseFlower(freeFlower: number, payFlower: number, needFlower: number): {
+    updateFlower: {freeFlower: number, payFlower: number},
+    history: {flowerValue: number, isFreeFlower: boolean}[]
+  } {
+    if ((freeFlower + payFlower) < needFlower) throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
+    if (freeFlower > needFlower) {
+      return {
+        updateFlower: {freeFlower: freeFlower - needFlower, payFlower},
+        history: [{flowerValue: -needFlower, isFreeFlower: true}],
+      };
+    } else if (freeFlower > 0) {
+      return {
+        updateFlower: {freeFlower: 0, payFlower: payFlower - (needFlower - freeFlower)},
+        history: [{flowerValue: -freeFlower, isFreeFlower: true}, {flowerValue: -(needFlower - freeFlower), isFreeFlower: false}],
+      };
+    } else {
+      return {
+        updateFlower: {freeFlower: 0, payFlower: payFlower - needFlower},
+        history: [{flowerValue: -(needFlower - freeFlower), isFreeFlower: false}],
+      };
+    }
+  }
 
   public static getFilesAndFields(request: Request, saveFolder: string) {
     const uploadedFiles = request.files;
@@ -49,8 +73,8 @@ export class Utils {
   }
 
   public static getBetweenDate(year?: number, month?: number): [Date, Date] | undefined {
-    if(!year) return;
-    if(!month) {
+    if (!year) return;
+    if (!month) {
       return [moment(`${year}-01-01`).startOf('year').toDate(), moment(`${year}-01-01`).endOf('year').toDate()];
     }
     return [moment(`${year}-${month}-01`).startOf('month').toDate(), moment(`${year}-${month}-01`).endOf('month').toDate()];
@@ -72,14 +96,13 @@ export class Utils {
 
   public static rsaEnc(planStr: string): string {
     const encrypted = crypto.publicEncrypt({key: CONFIG.gifting.rsaPublicKey, padding: crypto.constants.RSA_PKCS1_PADDING}, Buffer.from(planStr));
-    return encrypted.toString("base64");
+    return encrypted.toString('base64');
   }
 
   public static rsaDnc(encStr: string): string {
-    const decrypted = crypto.privateDecrypt({key: CONFIG.gifting.rsaPrivateKey, padding: crypto.constants.RSA_PKCS1_PADDING}, Buffer.from(encStr, "base64"));
-    return decrypted.toString("utf8");
+    const decrypted = crypto.privateDecrypt({key: CONFIG.gifting.rsaPrivateKey, padding: crypto.constants.RSA_PKCS1_PADDING}, Buffer.from(encStr, 'base64'));
+    return decrypted.toString('utf8');
   }
-
 
 
 }

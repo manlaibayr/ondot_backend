@@ -1,6 +1,8 @@
-import {Entity, hasMany, hasOne, model, property} from '@loopback/repository';
+import {belongsTo, Entity, hasMany, model, property} from '@loopback/repository';
 import {HobbyRoomMember} from './hobby-room-member.model';
 import {HobbyRoomBoard} from './hobby-room-board.model';
+import {User, UserWithRelations} from './user.model';
+import {HobbyRoomDibs} from './hobby-room-dibs.model';
 
 @model({settings: {mysql: {table: 'hobby_room'}}})
 export class HobbyRoom extends Entity {
@@ -11,10 +13,7 @@ export class HobbyRoom extends Entity {
   })
   id: string;
 
-  @property({
-    type: 'string',
-    required: true,
-  })
+  @belongsTo(() => User, {keyTo: 'userId', name: 'user'})
   userId: string;
 
   @property({
@@ -159,7 +158,10 @@ export class HobbyRoom extends Entity {
   roomMembers?: HobbyRoomMember[]
 
   @hasMany<HobbyRoomBoard>(() => HobbyRoomBoard, {keyTo: 'boardRoomId'})
-  roomBoards?: HobbyRoomMember[]
+  roomBoards?: HobbyRoomBoard[]
+
+  @hasMany<HobbyRoomDibs>(() => HobbyRoomDibs, {keyTo: 'dibsRoomId'})
+  roomDibs?: HobbyRoomDibs[]
 
   constructor(data?: Partial<HobbyRoom>) {
     super(data);
@@ -168,8 +170,10 @@ export class HobbyRoom extends Entity {
 
 export interface HobbyRoomRelations {
   // describe navigational properties here
+  user?: UserWithRelations;
   roomMembers?: HobbyRoomMember[];
   roomBoards?: HobbyRoomBoard[];
+  roomDibs?: HobbyRoomDibs[];  // 찜한 목록
 }
 
 export type HobbyRoomWithRelations = HobbyRoom & HobbyRoomRelations;

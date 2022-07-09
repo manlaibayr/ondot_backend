@@ -1,4 +1,5 @@
 import {Entity, model, property} from '@loopback/repository';
+import {ChargeStatus} from '../types';
 
 @model({settings: {mysql: {table: 'charge_history'}}})
 export class ChargeHistory extends Entity {
@@ -42,6 +43,14 @@ export class ChargeHistory extends Entity {
     type: 'string',
   })
   chargeDesc?: string;
+
+  @property({
+    type: 'string',
+    jsonSchema: {
+      enum: Object.values(ChargeStatus)
+    }
+  })
+  chargeStatus?: ChargeStatus;
 
   @property({
     type: 'date',

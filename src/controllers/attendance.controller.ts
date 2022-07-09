@@ -46,12 +46,13 @@ export class AttendanceController {
       }
       if(addFlower !== 0) {
         const userInfo = await this.userRepository.findById(currentUser.userId);
-        userInfo.userFlower = !userInfo.userFlower ? addFlower : userInfo.userFlower + addFlower;
+        userInfo.freeFlower = !userInfo.freeFlower ? addFlower : userInfo.freeFlower + addFlower;
         await this.userRepository.save(userInfo);
         await this.flowerHistoryRepository.create({
           flowerUserId: currentUser.userId,
           flowerContent: attendanceCount.count + '일 출석체크 보상',
           flowerValue: addFlower,
+          isFreeFlower: true
         })
       }
     }

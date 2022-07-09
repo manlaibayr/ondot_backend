@@ -33,3 +33,4 @@ export * from './charge-history.repository';
 export * from './gift-goods.repository';
 export * from './gift-history.repository';
 export * from './usage-pass.repository';
+export * from './learning-profile.repository';

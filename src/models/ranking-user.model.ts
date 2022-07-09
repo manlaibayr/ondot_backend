@@ -3,6 +3,7 @@ import {RankingType, ServiceType} from '../types';
 import {User, UserWithRelations} from './user.model';
 import {HobbyProfile} from './hobby-profile.model';
 import {MeetingProfile} from './meeting-profile.model';
+import {HobbyRoom} from './hobby-room.model';
 
 @model({settings: {mysql: {table: 'ranking_user'}}})
 export class RankingUser extends Entity {
@@ -14,7 +15,10 @@ export class RankingUser extends Entity {
   id: string;
 
   @belongsTo(() => User, {keyTo: 'rankingUserId', name: 'user'})
-  rankingUserId: string;
+  rankingUserId?: string;
+
+  @belongsTo(() => HobbyRoom, {keyTo: 'rankingHobbyRoomId', name: 'hobbyRoom'})
+  rankingHobbyRoomId?: string;
 
   @property({
     type: 'number',
@@ -48,6 +52,11 @@ export class RankingUser extends Entity {
 
   @property({
     type: 'boolean',
+  })
+  rankingSex?: boolean;
+
+  @property({
+    type: 'boolean',
     default: true
   })
   rankingShow: boolean;
@@ -61,8 +70,8 @@ export class RankingUser extends Entity {
   @hasOne(() => MeetingProfile, {keyTo: 'userId', keyFrom: 'rankingUserId'})
   meetingProfile?: MeetingProfile;
 
-  @hasOne(() => HobbyProfile, {keyTo: 'userId', keyFrom: 'rankingUserId'})
-  hobbyProfile?: HobbyProfile;
+  @hasOne(() => HobbyRoom, { keyTo: 'id', keyFrom: 'rankingHobbyRoomId'})
+  hobbyRoom?: HobbyRoom;
 
   constructor(data?: Partial<RankingUser>) {
     super(data);
@@ -73,7 +82,7 @@ export interface RankingUserRelations {
   // describe navigational properties here
   user?: UserWithRelations;
   meetingProfile?: MeetingProfile,
-  hobbyProfile?: HobbyProfile;
+  hobbyRoom?: HobbyRoom;
 }
 
 export type RankingUserWithRelations = RankingUser & RankingUserRelations;

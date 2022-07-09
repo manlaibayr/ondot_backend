@@ -1,4 +1,5 @@
-import {Entity, model, property} from '@loopback/repository';
+import {Entity, hasOne, model, property} from '@loopback/repository';
+import {User} from './user.model';
 
 @model({settings: {mysql: {table: 'gift_history'}}})
 export class GiftHistory extends Entity {
@@ -56,6 +57,12 @@ export class GiftHistory extends Entity {
   })
   createdAt?: Date;
 
+  @hasOne(() => User, {keyTo: 'id', keyFrom: 'giftSendUserId'})
+  senderUser?: User;
+
+  @hasOne(() => User, {keyTo: 'id', keyFrom: 'giftReceiveUserId'})
+  receiverUser?: User;
+
 
   constructor(data?: Partial<GiftHistory>) {
     super(data);
@@ -64,6 +71,8 @@ export class GiftHistory extends Entity {
 
 export interface GiftHistoryRelations {
   // describe navigational properties here
+  senderUser?: User,
+  receiverUser?: User;
 }
 
 export type GiftHistoryWithRelations = GiftHistory & GiftHistoryRelations;

@@ -115,8 +115,10 @@ export class UserController {
     }
     const niceInfo = VerifyCodeController.getNicePhoneNumber(
       signUpInfo.niceAuthResp.tokenVersionId, signUpInfo.niceAuthResp.encData, signUpInfo.niceAuthResp.integrityValue, signUpInfo.niceAuthResp.token);
-    const checkRealUserCount = await this.userRepository.count({realUserId: niceInfo.realUserId});
-    if(checkRealUserCount.count > 0) throw new HttpErrors.BadRequest(niceInfo.name + '님은 이미 계정이 존재합니다.');
+    const checkRealUserInfo = await this.userRepository.findOne({where:{realUserId: niceInfo.realUserId}});
+    if(checkRealUserInfo) {
+      throw new HttpErrors.BadRequest(niceInfo.name + `님은 이미 ${checkRealUserInfo.email}으로 이미 가입이 되있으십니다.`);
+    }
     signUpInfo.phoneNumber = niceInfo.phoneNumber;
     const userInfo = await this.userRepository.create({
       username: niceInfo.name,
@@ -222,7 +224,8 @@ export class UserController {
       email: userInfo.email,
       age: userInfo.age,
       phoneNumber: userInfo.phoneNumber,
-      userFlower: userInfo.userFlower,
+      freeFlower: userInfo.freeFlower,
+      payFlower: userInfo.payFlower,
       profile: {
         meeting: profileMeeting,
         hobby: profileHobby,
