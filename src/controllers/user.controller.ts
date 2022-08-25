@@ -193,7 +193,11 @@ export class UserController {
     const findInfo = await this.userRepository.findOne({where: {email: userInfo.email, signupType: userInfo.signupType}});
     if (findInfo) {
       // 이미 로그인된 계정, 로그인으로 이동
-      return {result: 'login'};
+      if(findInfo.signupType === userInfo.signupType) {
+        return {result: 'login'};
+      } else {
+        return {result: 'existEmail', data: {signupType: findInfo.signupType}}
+      }
     } else {
       // 새로 추가되어야 하는 계정
       return {result: 'signup'};

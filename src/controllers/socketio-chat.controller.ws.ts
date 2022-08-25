@@ -52,7 +52,7 @@ export class ChatControllerWs {
   async getContactInfo(userId: string, chatType: ChatType) {
     const contactInfo = await this.chatContactRepository.findById(this.chatContactId);
     const otherUserId = contactInfo.contactUserId === userId ? contactInfo.contactOtherUserId : contactInfo.contactUserId;
-    if(chatType === ChatType.MEETING_CHAT) {
+    if (chatType === ChatType.MEETING_CHAT) {
       const [meProfile, otherProfile] = await Promise.all([
         this.meetingProfileRepository.findOne({where: {userId: userId}}),
         this.meetingProfileRepository.findOne({where: {userId: otherUserId}}),
@@ -153,7 +153,13 @@ export class ChatControllerWs {
         } else {
           const hobbyProfile = await this.hobbyProfileRepository.findOne({where: {userId: user.id}});
           if (!hobbyProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
-          const roomMemberInfo = await this.hobbyRoomMemberRepository.findOne({where: {roomId:this.chatContactId, memberUserId: verifyTokenObj.user_id, memberJoinStatus: {neq: RoomMemberJoinType.KICK}}});
+          const roomMemberInfo = await this.hobbyRoomMemberRepository.findOne({
+            where: {
+              roomId: this.chatContactId,
+              memberUserId: verifyTokenObj.user_id,
+              memberJoinStatus: {neq: RoomMemberJoinType.KICK},
+            },
+          });
           if (!roomMemberInfo) throw new HttpErrors.BadRequest('모임방에 가입하지 않아 채팅을 할수 없습니다.');
           this.meInfo = {id: hobbyProfile.userId, profile: hobbyProfile.hobbyPhoto, nickname: hobbyProfile.hobbyNickname};
           const previousChatList = await this.chatGroupMsgRepository.find({where: {groupRoomId: this.chatContactId}, include: [{relation: 'hobbyProfile'}], order: ['createdAt asc']});
@@ -272,12 +278,19 @@ export class ChatControllerWs {
     }
   }
 
-  @ws.subscribe('CLIENT_VOICE_REQ')
-  async voiceReq(
-    chatMsg: any,
+  @ws.subscribe('CLIENT_VOICE_CALL')
+  async voiceCall(
+    data: any,
     @ws.namespace('main') nspMain: Namespace,
   ) {
-    nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_VOICE_REQ, {offer: chatMsg.offer});
+    nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_VOICE_REQ, {
+      chatContactId: this.chatContactId,
+      profile: {
+        profile: this.meInfo.profile,
+        id: this.meInfo.id,
+        nickname: this.meInfo.nickname,
+      },
+    });
   }
 
 

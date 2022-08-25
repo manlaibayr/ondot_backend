@@ -6,6 +6,7 @@ import moment from 'moment';
 import {v4 as uuidv4} from 'uuid';
 import {secured, SecuredType} from '../role-authentication';
 import {CONFIG} from '../config';
+import {SignupType} from '../types';
 
 const crypto = require('crypto');
 const CryptoJs = require('crypto-js');
@@ -27,27 +28,38 @@ export class VerifyCodeController {
     @param.query.string('number') phoneNumber: string,
   ) {
     // check user exist
-    const userInfo = await this.userRepository.findOne({where: {email, phoneNumber}});
+    const userInfo = await this.userRepository.findOne({where: {email}});
     if (!userInfo) throw new HttpErrors.BadRequest('입력하신 정보와 일치하는 회원이 없습니다.');
-    const verifyCodeString = Math.floor(100000 + Math.random() * 900000).toString();
-    const formUrlEncoded = (x: any) => Object.keys(x).reduce((p, c) => p + `&${c}=${encodeURIComponent(x[c])}`, '');
+    if(userInfo.signupType === SignupType.NAVER) {
+      throw new HttpErrors.BadRequest('네이버계정으로 로그인한 회원입니다.');
+    } else if(userInfo.signupType === SignupType.KAKAO) {
+      throw new HttpErrors.BadRequest('카카오계정으로 로그인한 회원입니다.');
+    } else if(userInfo.signupType === SignupType.GOOGLE) {
+      throw new HttpErrors.BadRequest('구글계정으로 로그인한 회원입니다.');
+    } else if(userInfo.signupType === SignupType.EMAIL) {
+      if(userInfo.phoneNumber !== phoneNumber) throw new HttpErrors.BadRequest('휴대폰번호가 정확하지 않습니다.');
+      const verifyCodeString = Math.floor(100000 + Math.random() * 900000).toString();
+      const formUrlEncoded = (x: any) => Object.keys(x).reduce((p, c) => p + `&${c}=${encodeURIComponent(x[c])}`, '');
 
-    const smsResult = await axios.post(
-      'https://apis.aligo.in/send/',
-      formUrlEncoded({
-        key: 'nzqdlpr9gfkio7a32uih1e67sl8nxxop', user_id: 'ontec', sender: '01055556408', receiver: phoneNumber,
-        msg_type: 'SMS', title: '온닷', msg: `[온닷] 인증번호 [${verifyCodeString}]를 입력해 주세요.`, testmode_yn: 'N',
-      }),
-      {
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      },
-    );
-    console.log(verifyCodeString);
-    if (smsResult.data.result_code === '1') {
-      const codeInfo = await this.verifyCodeRepository.create({verifyPhoneNumber: phoneNumber, verifyCodeString, expiredDate: moment().add(10, 'minutes')});
-      return {codeId: codeInfo.id};
+      const smsResult = await axios.post(
+        'https://apis.aligo.in/send/',
+        formUrlEncoded({
+          key: 'nzqdlpr9gfkio7a32uih1e67sl8nxxop', user_id: 'ontec', sender: '01055556408', receiver: phoneNumber,
+          msg_type: 'SMS', title: '온닷', msg: `[온닷] 인증번호 [${verifyCodeString}]를 입력해 주세요.`, testmode_yn: 'N',
+        }),
+        {
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        },
+      );
+      console.log(verifyCodeString);
+      if (smsResult.data.result_code === '1') {
+        const codeInfo = await this.verifyCodeRepository.create({verifyPhoneNumber: phoneNumber, verifyCodeString, expiredDate: moment().add(10, 'minutes')});
+        return {codeId: codeInfo.id};
+      } else {
+        throw new HttpErrors.BadRequest('인증메시지를 전송하지 못했습니다.');
+      }
     } else {
-      throw new HttpErrors.BadRequest('인증메시지를 전송하지 못했습니다.');
+      throw new HttpErrors.BadRequest('비밀번호를 재설정할수 없습니다.');
     }
   }
 

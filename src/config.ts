@@ -56,4 +56,6 @@ export const CONFIG = {
     // rsaPublicKey: '',
     // rsaPrivateKey: ''
   },
+
+  kakaoRestApiKey: '1715c7ad5667d63c3a97de837bd12569'
 };

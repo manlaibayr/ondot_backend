@@ -41,6 +41,16 @@ export class MeetingProfile extends Entity {
   @property({
     type: 'number',
   })
+  meetingResidenceLat?: number;
+
+  @property({
+    type: 'number',
+  })
+  meetingResidenceLng?: number;
+
+  @property({
+    type: 'number',
+  })
   meetingHeight?: number;
 
   @property({

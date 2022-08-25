@@ -4,6 +4,7 @@ import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import moment from 'moment';
+import axios from 'axios';
 import {FILE_UPLOAD_SERVICE} from '../keys';
 import {FileUploadHandler, ServiceType, UserCredentials} from '../types';
 import {MeetingProfile} from '../models';
@@ -23,12 +24,13 @@ import {secured, SecuredType} from '../role-authentication';
 import {Utils} from '../utils';
 import {FlowerController} from './flower.controller';
 import {RankingUserController} from './ranking-user.controller';
+import {CONFIG} from '../config';
 
 export class MeetingProfileController {
   constructor(
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @repository(UserRepository) public userRepository: UserRepository,
-    @repository(LikeRepository) public likeRepository : LikeRepository,
+    @repository(LikeRepository) public likeRepository: LikeRepository,
     @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
     @repository(RatingRepository) public ratingRepository: RatingRepository,
     @repository(VisitRepository) public visitRepository: VisitRepository,
@@ -41,6 +43,19 @@ export class MeetingProfileController {
     @inject(`controllers.FlowerController`) private flowerController: FlowerController,
     @inject(`controllers.RankingUserController`) private rankingUserController: RankingUserController,
   ) {
+  }
+
+  async getCoordinates(address: string) {
+    const url = 'https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(address);
+    axios.defaults.withCredentials = false;
+    axios.defaults.headers.common['Authorization'] = 'KakaoAK ' + 'xxxxxxxxxxxxxxxxxxxxxxx';
+    axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded';
+    const resp = await axios.get(url, {headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': 'KakaoAK ' + CONFIG.kakaoRestApiKey}});
+    if(resp.data.documents.length > 0) {
+      return {lat: resp.data.documents[0].y, lng: resp.data.documents[0].x};
+    } else {
+      return {lat: 0, lng: 0};
+    }
   }
 
   @get('/meeting-profiles')
@@ -58,12 +73,12 @@ export class MeetingProfileController {
   })
   async find(
     @param.filter(MeetingProfile) filter?: Filter<MeetingProfile>,
-  ){
+  ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const likeCount = await this.likeRepository.count({likeOtherUserId: currentUser.userId});
     const visitCount = await this.visitRepository.count({visitOtherUserId: currentUser.userId, visitLastTime: {gte: moment().startOf('day').toDate()}});
     const profile = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
-    if(!profile) throw new HttpErrors.BadRequest('미팅 프로파일을 설정해야 합니다.');
+    if (!profile) throw new HttpErrors.BadRequest('미팅 프로파일을 설정해야 합니다.');
     const data: any = profile.toJSON();
     data.likeCount = likeCount.count;
     data.visitCount = visitCount.count;
@@ -109,14 +124,19 @@ export class MeetingProfileController {
     meetingProfile.age = userInfo.age;
     meetingProfile.sex = userInfo.sex ? '남성' : '여성';
     let freeFlower = currentUser.freeFlower;
-    if(meetingProfile.meetingPhotoAdditional && meetingProfile.meetingPhotoAdditional.split(',').length >= 4) {
+    if (meetingProfile.meetingPhotoAdditional && meetingProfile.meetingPhotoAdditional.split(',').length >= 4) {
       await this.flowerHistoryRepository.create({
         flowerUserId: currentUser.userId,
         flowerContent: '미팅프로필 등록시 사진 4장을 추가하여 받음',
         flowerValue: 20,
-        isFreeFlower: true
+        isFreeFlower: true,
       });
       freeFlower += 20;
+    }
+    if(meetingProfile.meetingResidence) {
+      const {lat, lng} = await this.getCoordinates(meetingProfile.meetingResidence);
+      meetingProfile.meetingResidenceLat = lat;
+      meetingProfile.meetingResidenceLng = lng;
     }
     const profileResult = await this.meetingProfileRepository.create(meetingProfile);
     await this.userRepository.updateById(currentUser.userId, {meetingProfileId: profileResult.id, freeFlower});
@@ -138,6 +158,11 @@ export class MeetingProfileController {
     })
       meetingProfile: Omit<MeetingProfile, 'id' | 'age' | 'sex'>,
   ): Promise<Count> {
+    if(meetingProfile.meetingResidence) {
+      const {lat, lng} = await this.getCoordinates(meetingProfile.meetingResidence);
+      meetingProfile.meetingResidenceLat = lat;
+      meetingProfile.meetingResidenceLng = lng;
+    }
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     return this.meetingProfileRepository.updateAll(meetingProfile, {userId: currentUser.userId});
   }
@@ -167,26 +192,31 @@ export class MeetingProfileController {
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     let otherProfile = await this.meetingProfileRepository.findOne({where: {userId: id}});
-    if(!otherProfile) otherProfile = await this.meetingProfileRepository.findById(id);
+    if (!otherProfile) otherProfile = await this.meetingProfileRepository.findById(id);
     const likeInfo = await this.likeRepository.findOne({where: {likeUserId: currentUser.userId, likeOtherUserId: otherProfile.userId, likeServiceType: ServiceType.MEETING}});
     const meetingChatList = await this.chatContactRepository.findOne(
-      {where: {or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}], contactServiceType: ServiceType.MEETING}}
-    )
+      {
+        where: {
+          or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}],
+          contactServiceType: ServiceType.MEETING,
+        },
+      },
+    );
     const ratingCount = await this.ratingRepository.count({ratingUserId: currentUser.userId, ratingOtherUserId: otherProfile.userId});
     const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: otherProfile.userId, blockServiceType: ServiceType.MEETING}});
     const data: any = otherProfile.toJSON();
-    data.meetingResidence = data.meetingResidence.split(' ').slice(0,2).join(' ');
+    data.meetingResidence = data.meetingResidence.split(' ').slice(0, 2).join(' ');
     data.isLike = !!likeInfo;
     data.isChat = !!meetingChatList;
     data.isGiveRating = ratingCount.count > 0;
     data.isBlock = !!blockInfo;
     data.totalFavor = await this.rankingUserController.calcUserMeetingTotalFavor(otherProfile.userId);
-    if(otherProfile.meetingJobHide) {
+    if (otherProfile.meetingJobHide) {
       data.meetingJob = '비공개';
     }
     data.hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
     const visitInfo = await this.visitRepository.findOne({where: {visitUserId: currentUser.userId, visitOtherUserId: otherProfile.userId, visitServiceType: ServiceType.MEETING}});
-    if(visitInfo) {
+    if (visitInfo) {
       await this.visitRepository.updateById(visitInfo.id, {visitLastTime: new Date()});
     } else {
       await this.visitRepository.create({visitUserId: currentUser.userId, visitOtherUserId: otherProfile.userId, visitServiceType: ServiceType.MEETING, visitLastTime: new Date()});

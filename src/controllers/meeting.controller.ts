@@ -10,6 +10,7 @@ import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {FlowerController} from './flower.controller';
 import {Utils} from '../utils';
+import {MeetingProfile} from '../models';
 
 export class MeetingController {
   constructor(
@@ -24,25 +25,85 @@ export class MeetingController {
   ) {
   }
 
+  getMatchCount(
+    myProfile: any,
+    otherProfile: any,
+  ): number {
+    const keys = [
+      {myStartKey: 'meetingOtherStartAge', myEndKey: 'meetingOtherEndAge', otherKey: 'age'},
+      {myKey: 'meetingOtherResidence', otherKey: 'meetingResidence'},
+      {myKey: 'meetingOtherMeeting', otherKey: 'meetingMeeting'},
+      {myKey: 'meetingOtherBodyType', otherKey: 'meetingBodyType'},
+      {myStartKey: 'meetingOtherStartHeight', myEndKey: 'meetingOtherEndHeight', otherKey: 'meetingHeight'},
+      {myKey: 'meetingOtherSex', otherKey: 'sex'},
+      {myKey: 'meetingOtherPersonality', otherKey: 'meetingPersonality'},
+      {myKey: 'meetingOtherSmoking', otherKey: 'meetingSmoking'},
+    ]
+    let matchCount = 0;
+    keys.forEach((v: any) => {
+      if(v.myKey && v.myKey.indexOf('Residence') !== -1) {
+        if(otherProfile[v.otherKey].indexOf(myProfile[v.myKey])) matchCount++;
+      } else if(v.myKey) {
+        if(myProfile[v.myKey] === otherProfile[v.otherKey]) matchCount++;
+      } else if (v.myStartKey && v.myEndKey) {
+        if(myProfile[v.myStartKey] <= otherProfile[v.otherKey] && myProfile[v.myEndKey] >= otherProfile[v.otherKey]) matchCount++;
+      }
+    });
+    return matchCount;
+  }
+
+  getDistance(
+    myProfile: any,
+    otherProfile: any,
+  ): number {
+    if(!myProfile.meetingResidenceLat || !myProfile.meetingResidenceLng || !otherProfile.meetingResidenceLat || !otherProfile.meetingResidenceLng) return 999999;
+    const toRad = (value: number) => {
+      return value * Math.PI / 180;
+    };
+    const R = 6371; // km
+    const dLat = toRad(otherProfile.meetingResidenceLat - myProfile.meetingResidenceLat);
+    const dLon = toRad(otherProfile.meetingResidenceLng - myProfile.meetingResidenceLng);
+    const lat1 = toRad(myProfile.meetingResidenceLat);
+    const lat2 = toRad(otherProfile.meetingResidenceLat);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
   @get('/meetings/main')
   @secured(SecuredType.IS_AUTHENTICATED)
   async meetingMain(
     @ws.namespace('main') nspMain: Namespace,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const myProfile = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     // 지인차단
     const blockPhones = await this.blockPhoneRepository.find({where: {blockPhoneUserId: currentUser.userId}});
     const blockUsers = await this.userRepository.find({where: {phoneNumber: {inq: blockPhones.map((v) => v.blockPhoneNum)}}});
-    const userList = await this.meetingProfileRepository.find({where: {userId: {nin: blockUsers.map((v) => v.id)}}});
-    const i = userList.findIndex((v) => v.userId === currentUser.userId);
-    const myProfile = i !== -1 ? userList.splice(i, 1)[0] : null;
-    const profileList: any = [];
+    const blokcIds = blockUsers.map((v) => v.id);
+    blokcIds.push(currentUser.userId);
+    const profileList = await this.meetingProfileRepository.find({where: {userId: {nin: blokcIds}}});
+
+    //인기순
+    const popularList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
+
+    // 매칭순
+    profileList.sort((a: any, b: any) => {
+      return (this.getMatchCount(myProfile, b) - this.getMatchCount(myProfile, a));
+    });
+    const matchList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
+    // 거리순
+    profileList.sort((a: any, b: any) => {
+      return (this.getDistance(myProfile, b) - this.getMatchCount(myProfile, a));
+    });
+    const nearList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
     // 인기순
 
     // 접속한 회원 리스트
     const rooms: any = nspMain.adapter.rooms;
     const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
-    userList.forEach((v) => {
+    profileList.forEach((v) => {
       const info: any = v.toJSON();
       info.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
       profileList.push(info);
@@ -50,9 +111,9 @@ export class MeetingController {
 
     const data = {
       meetingProfile: myProfile,
-      popularList: profileList.splice(0, 15),
-      nearList: profileList.splice(15, 25),
-      matchList: profileList.splice(26, 31),
+      popularList,
+      nearList,
+      matchList,
     };
     return data;
   }

@@ -66,7 +66,7 @@ export class PowerApiApplication extends BootMixin(
     this.api({
       openapi: '3.0.0',
       info: {
-        title: 'AD-LIB Api',
+        title: 'Ondot Api',
         version: require('.././package.json').version,
       },
       paths: {},
