@@ -117,7 +117,11 @@ export class UserController {
       signUpInfo.niceAuthResp.tokenVersionId, signUpInfo.niceAuthResp.encData, signUpInfo.niceAuthResp.integrityValue, signUpInfo.niceAuthResp.token);
     const checkRealUserInfo = await this.userRepository.findOne({where:{realUserId: niceInfo.realUserId}});
     if(checkRealUserInfo) {
-      throw new HttpErrors.BadRequest(niceInfo.name + `님은 이미 ${checkRealUserInfo.email}으로 이미 가입이 되있으십니다.`);
+        if(checkRealUserInfo.signupType === signUpInfo.type) {
+          throw new HttpErrors.BadRequest(niceInfo.name + `님은 이미 ${checkRealUserInfo.email}으로 이미 가입이 되있으십니다.`);
+        } else {
+          return {result: 'existEmail', data: {userId: checkRealUserInfo.id, email: checkRealUserInfo.email, signupType: checkRealUserInfo.signupType}}
+        }
     }
     signUpInfo.phoneNumber = niceInfo.phoneNumber;
     const userInfo = await this.userRepository.create({
