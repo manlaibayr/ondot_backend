@@ -5,10 +5,10 @@ import jwt from 'jsonwebtoken';
 import moment from 'moment';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {CONFIG} from '../config';
-import {User, Verifytoken} from '../models';
+import {ChatMsg, User, Verifytoken} from '../models';
 import {
   ChatContactRepository,
-  ChatMsgRepository,
+  ChatMsgRepository, MeetingProfileRepository,
   UserRepository,
   VerifytokenRepository,
 } from '../repositories';
@@ -22,6 +22,7 @@ export class WebrtcControllerWs {
   private chatContactId: string;
   private meUserId: string;
   private otherUserId: string;
+  private meInfo: {id: string, nickname?: string, profile?: string};
 
   constructor(
     @ws.socket() private socket: Socket, // Equivalent to `@inject('ws.socket')`
@@ -29,6 +30,7 @@ export class WebrtcControllerWs {
     @repository(VerifytokenRepository) private verifytokenRepository: VerifytokenRepository,
     @repository(ChatMsgRepository) private chatMsgRepository: ChatMsgRepository,
     @repository(ChatContactRepository) private chatContactRepository: ChatContactRepository,
+    @repository(MeetingProfileRepository) private meetingProfileRepository: MeetingProfileRepository,
   ) {
   }
 
@@ -55,9 +57,12 @@ export class WebrtcControllerWs {
         const contactInfo = await this.chatContactRepository.findById(this.chatContactId);
         this.meUserId = user.id;
         this.otherUserId = contactInfo.contactUserId === user.id ? contactInfo.contactOtherUserId : contactInfo.contactUserId;
+        const meMeetingProfile = await this.meetingProfileRepository.findOne({where: {userId: user.id}});
+        if (!meMeetingProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
+        this.meInfo = {id: meMeetingProfile.userId, profile: meMeetingProfile.meetingPhotoMain, nickname: meMeetingProfile.meetingNickname};
       } catch (e) {
         console.error(e);
-        // this.socket.disconnect();
+        this.socket.disconnect();
       }
     } else {
       console.log('JWT토큰이 정확하지 않습니다.');
@@ -105,25 +110,65 @@ export class WebrtcControllerWs {
   @ws.subscribe('CLIENT_WEBRTC_REJECT')
   async webrtcReject(
     payload: any,
+    @ws.namespace('chat') nspChat: Namespace,
   ) {
-    console.log('answer', payload);
+    console.log('reject', payload);
+    const msgInfo: ChatMsg = await this.chatMsgRepository.create({
+      chatContactId: this.chatContactId,
+      senderUserId: this.meUserId,
+      receiverUserId: this.otherUserId,
+      msgContent: `거절`,
+      msgType: 'text',
+      msgSenderStatus: ChatMsgStatus.READ,
+      msgReceiverStatus: ChatMsgStatus.READ,
+    });
     this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_WEBRTC_REJECTED, payload);
+    const sendMsgObj = {
+      id: msgInfo.id,
+      type: msgInfo.msgType,
+      content: '📞 ' + msgInfo.msgContent,
+      targetId: this.meUserId,
+      chatInfo: {
+        avatar: this.meInfo.profile,
+        id: this.meInfo.id,
+        nickName: this.meInfo.nickname,
+      },
+      // renderTime: true,
+      sendStatus: 1,
+      time: moment(msgInfo.createdAt).unix() * 1000,
+    };
+    nspChat.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, sendMsgObj)
   }
 
   @ws.subscribe('CLIENT_WEBRTC_FINISH')
   async webrtcFinish(
     payload: any,
+    @ws.namespace('chat') nspChat: Namespace,
   ) {
-    console.log('answer', payload);
-    await this.chatMsgRepository.create({
+    const msgInfo = await this.chatMsgRepository.create({
       chatContactId: this.chatContactId,
-      senderUserId: this.otherUserId,
-      receiverUserId: this.meUserId,
-      msgContent: `통화시간: ${payload.time}`,
+      senderUserId: this.meUserId,
+      receiverUserId: this.otherUserId,
+      msgContent: payload.isConnected ? `통화시간: ${payload.time}` : '취소',
       msgType: 'text',
       msgSenderStatus: ChatMsgStatus.READ,
       msgReceiverStatus: ChatMsgStatus.READ,
     });
     this.socket.to(this.chatContactId).emit(ChatSocketMsgType.SRV_WEBRTC_FINISH, payload);
+    const sendMsgObj = {
+      id: msgInfo.id,
+      type: msgInfo.msgType,
+      content: '📞 ' + msgInfo.msgContent,
+      targetId: this.meUserId,
+      chatInfo: {
+        avatar: this.meInfo.profile,
+        id: this.meInfo.id,
+        nickName: this.meInfo.nickname,
+      },
+      // renderTime: true,
+      sendStatus: 1,
+      time: moment(msgInfo.createdAt).unix() * 1000,
+    };
+    nspChat.to(this.chatContactId).emit(ChatSocketMsgType.SRV_RECEIVE_MSG, sendMsgObj)
   }
 }

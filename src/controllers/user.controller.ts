@@ -190,13 +190,13 @@ export class UserController {
     @requestBody() info: {type: SignupType; data: any},
   ) {
     const userInfo = await this.thirdUserInfo(info.type, info.data);
-    const findInfo = await this.userRepository.findOne({where: {email: userInfo.email, signupType: userInfo.signupType}});
+    const findInfo = await this.userRepository.findOne({where: {email: userInfo.email}});
     if (findInfo) {
       // 이미 로그인된 계정, 로그인으로 이동
       if(findInfo.signupType === userInfo.signupType) {
         return {result: 'login'};
       } else {
-        return {result: 'existEmail', data: {signupType: findInfo.signupType}}
+        return {result: 'existEmail', data: {userId: findInfo.id, email: userInfo.email, signupType: findInfo.signupType}}
       }
     } else {
       // 새로 추가되어야 하는 계정
@@ -279,12 +279,13 @@ export class UserController {
 
   @post('/users/reset-password')
   async resetPassword(
-    @requestBody() data: {email: string, phoneNumber: string, password: string, codeId: string, code: string},
+    @requestBody() data: {email: string, password: string, tokenVersionId: string, encData: string, integrityValue: string, token: string},
   ) {
-    const verifyCodeInfo = await this.verifyCodeRepository.findOne({where: {id: data.codeId, verifyCodeString: data.code, verifyPhoneNumber: data.phoneNumber}});
-    if (!verifyCodeInfo) throw new HttpErrors.InternalServerError('잘못된 요청입니다.');
-    await this.verifyCodeRepository.deleteById(data.codeId);
-    const userInfo = await this.userRepository.findOne({where: {email: data.email, phoneNumber: data.phoneNumber}});
+    // const verifyCodeInfo = await this.verifyCodeRepository.findOne({where: {id: data.codeId, verifyCodeString: data.code, verifyPhoneNumber: data.phoneNumber}});
+    // if (!verifyCodeInfo) throw new HttpErrors.InternalServerError('잘못된 요청입니다.');
+    // await this.verifyCodeRepository.deleteById(data.codeId);
+    const niceInfo = VerifyCodeController.getNicePhoneNumber(data.tokenVersionId, data.encData, data.integrityValue, data.token);
+    const userInfo = await this.userRepository.findOne({where: {email: data.email, realUserId: niceInfo.realUserId}});
     if (!userInfo) throw new HttpErrors.InternalServerError('잘못된 요청입니다.');
     return this.userRepository.updateById(userInfo.id, {password: this.generatePassword(data.password)});
   }
@@ -312,6 +313,17 @@ export class UserController {
     return {emailExist: count !== 0};
   }
 
+  @post('/users/change-signup-type')
+  @secured(SecuredType.PERMIT_ALL)
+  async changeSignupType(
+    @requestBody() data: {userId: string, thirdTokenData: any},
+  ) {
+    const thirdUserInfo = await this.thirdUserInfo(data.thirdTokenData.type, data.thirdTokenData.data);
+    const userInfo = await this.userRepository.findById(data.userId);
+    if(userInfo.email === thirdUserInfo.email && userInfo.signupType !== thirdUserInfo.signupType) {
+      await this.userRepository.updateById(data.userId, {signupType: thirdUserInfo.signupType});
+    }
+  }
 
   //*========== admin functions ==========*//
   @get('/users')

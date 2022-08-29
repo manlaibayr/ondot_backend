@@ -1,6 +1,6 @@
 import {repository} from '@loopback/repository';
 import {UserRepository, VerifyCodeRepository} from '../repositories';
-import {param, get, HttpErrors} from '@loopback/rest';
+import {param, get, HttpErrors, requestBody, post} from '@loopback/rest';
 import axios from 'axios';
 import moment from 'moment';
 import {v4 as uuidv4} from 'uuid';
@@ -149,6 +149,23 @@ export class VerifyCodeController {
       url: niceAuthLink,
       token: CryptoJs.AES.encrypt(hashedVal, CryptoJs.enc.Utf8.parse(hashKey), {iv: CryptoJs.enc.Utf8.parse(hashIv)}).toString()
     };
+  }
+
+  @post('/verify-codes/user-from-nice')
+  async getUserInfoFromNice(
+    @requestBody() data: {tokenVersionId: string, encData: string, integrityValue: string, token: string}
+  ) {
+    const niceInfo = VerifyCodeController.getNicePhoneNumber(data.tokenVersionId, data.encData, data.integrityValue, data.token);
+    const userInfo = await this.userRepository.findOne({where: {realUserId: niceInfo.realUserId}});
+    if(userInfo) {
+      return {
+        result: 'exist',
+        signupType: userInfo?.signupType,
+        email: userInfo?.email,
+      }
+    } else {
+      return {result: 'signup'}
+    }
   }
 
 }
