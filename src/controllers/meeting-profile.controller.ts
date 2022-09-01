@@ -6,7 +6,7 @@ import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import axios from 'axios';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, ServiceType, UserCredentials} from '../types';
+import {FileUploadHandler, FlowerHistoryType, ServiceType, UserCredentials} from '../types';
 import {MeetingProfile} from '../models';
 import {
   BlockPhoneRepository,
@@ -130,6 +130,7 @@ export class MeetingProfileController {
         flowerContent: '미팅프로필 등록시 사진 4장을 추가하여 받음',
         flowerValue: 20,
         isFreeFlower: true,
+        flowerHistoryType: FlowerHistoryType.NORMAL
       });
       freeFlower += 20;
     }

@@ -56,6 +56,21 @@ export const CONFIG = {
     // rsaPublicKey: '',
     // rsaPrivateKey: ''
   },
-
-  kakaoRestApiKey: '1715c7ad5667d63c3a97de837bd12569'
+  kakaoRestApiKey: '1715c7ad5667d63c3a97de837bd12569',
+  appleSignupConfig: {
+    // client_id: 'com.ontec.ondot',
+    client_id: 'ondot.ontec.com',
+    team_id: 'G49XW457HS',
+    redirect_uri: 'https://ondot.kr/third-login/apple',
+    key_id: '7R45YL87BK',
+    scope: 'name email',
+  },
+  appleClientIdForApp: 'com.ontec.ondot',
+  appleClientIfForWeb: 'ondot.ontec.com',
+  appleAuthKey: '-----BEGIN PRIVATE KEY-----\n' +
+    'MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgB01OcXt+YKrImX4b\n' +
+    '1Btn0LYvZXtjGtrNW9FWoDtCss+gCgYIKoZIzj0DAQehRANCAASkzIR1I7J00PUw\n' +
+    'qBKrzd8kbUcRzRpQyVq4DirKjs8qEeSGiZ4erxZdfyNXb2NkitTrzBMjRbkwQt5d\n' +
+    'keDOXO1Y\n' +
+    '-----END PRIVATE KEY-----'
 };

@@ -1,12 +1,12 @@
 import {repository} from '@loopback/repository';
-import {post, getModelSchemaRef, requestBody, response, get} from '@loopback/rest';
+import {get, getModelSchemaRef, response} from '@loopback/rest';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import {Attendance} from '../models';
 import {AttendanceRepository, FlowerHistoryRepository, UserRepository} from '../repositories';
-import {UserCredentials} from '../types';
+import {FlowerHistoryType, UserCredentials} from '../types';
 import {secured, SecuredType} from '../role-authentication';
 
 export class AttendanceController {
@@ -32,7 +32,7 @@ export class AttendanceController {
     const info = await this.attendanceRepository.findOne({where: newAttendance});
     let addFlower = 0;
     if(!info) {
-      await this.attendanceRepository.create(newAttendance);
+      const attendanceInfo = await this.attendanceRepository.create(newAttendance);
       const attendanceCount = await this.attendanceRepository.count({attendanceUserId: currentUser.userId, attendanceMonth: month});
       if([7, 14, 21].indexOf(attendanceCount.count) !== -1) {
         // 플라워 50송이추가
@@ -52,7 +52,9 @@ export class AttendanceController {
           flowerUserId: currentUser.userId,
           flowerContent: attendanceCount.count + '일 출석체크 보상',
           flowerValue: addFlower,
-          isFreeFlower: true
+          isFreeFlower: true,
+          flowerHistoryType: FlowerHistoryType.ATTENDANCE,
+          flowerHistoryRefer: attendanceInfo.id,
         })
       }
     }

@@ -1,4 +1,4 @@
-import {get, HttpErrors, param, response} from '@loopback/rest';
+import {get, HttpErrors, param} from '@loopback/rest';
 import {Count, Filter, repository} from '@loopback/repository';
 import axios from 'axios';
 import iconv from 'iconv-lite';
@@ -6,9 +6,9 @@ import {v4 as uuidv4} from 'uuid';
 import {Utils} from '../utils';
 import {CONFIG} from '../config';
 import {FlowerHistoryRepository, GiftGoodsRepository, GiftHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
-import {GiftGoods, GiftHistory, GiftHistoryWithRelations, User, UserWithRelations} from '../models';
+import {GiftGoods, GiftHistory, GiftHistoryWithRelations} from '../models';
 import {secured, SecuredType} from '../role-authentication';
-import {MainSocketMsgType, NotificationType, ServiceType, UserCredentials, UserStatusType} from '../types';
+import {FlowerHistoryType, MainSocketMsgType, NotificationType, ServiceType, UserCredentials, UserStatusType} from '../types';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
@@ -156,11 +156,8 @@ export class GiftGoodsController {
       throw new HttpErrors.BadRequest(giftSendData.result_reason);
     }
 
-    await Promise.all([
+    const [updateUser, notificationInfo, giftHistoryInfo] = await Promise.all([
       this.userRepository.updateById(currentUser.userId, {payFlower: userInfo.payFlower - giftingFlower}),
-      this.flowerHistoryRepository.create(
-        {flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함', flowerValue: -giftingFlower, isFreeFlower: false},
-      ),
       this.notificationRepository.create({
         notificationSendUserId: currentUser.userId,
         notificationReceiveUserId: otherUserId,
@@ -180,6 +177,12 @@ export class GiftGoodsController {
         giftCtrId: giftSendData.ctr_id,
       })
     ]);
+    await this.flowerHistoryRepository.create({
+      flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함',
+      flowerValue: -giftingFlower, isFreeFlower: false,
+      flowerHistoryType: FlowerHistoryType.SEND_GIFT,
+      flowerHistoryRefer: giftHistoryInfo.id,
+    });
     nspMain.to(otherUserId).emit(MainSocketMsgType.SRV_NOTIFICATION, {
       title: '선물을 받았습니다.',
       msg: userMeetingProfile?.meetingNickname + `님에게서 선물(${giftingInfo.goods_nm})을 받았습니다.`,

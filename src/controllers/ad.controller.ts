@@ -8,7 +8,7 @@ import {repository} from '@loopback/repository';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {AdHistoryRepository, AdRepository, FlowerHistoryRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
-import {UserCredentials} from '../types';
+import {FlowerHistoryType, UserCredentials} from '../types';
 
 export class AdController {
   constructor(
@@ -46,8 +46,11 @@ export class AdController {
     ]);
     if(adHistoryCount.count >= adInfo.adTryCount) throw new HttpErrors.BadRequest('플라워를 받을수 없습니다.');
     await this.userRepository.updateById(currentUser.userId, {freeFlower: userInfo.freeFlower + adInfo.adFlower});
-    await this.flowerHistoryRepository.create({flowerUserId: currentUser.userId, flowerContent: '무료 충전 광고열람보상', flowerValue: adInfo.adFlower, isFreeFlower: true});
-    await this.adHistoryRepository.create({adHistoryUserId: currentUser.userId, adHistoryAdId: id, adHistoryFlower: adInfo.adFlower});
+    const adHistoryInfo = await this.adHistoryRepository.create({adHistoryUserId: currentUser.userId, adHistoryAdId: id, adHistoryFlower: adInfo.adFlower});
+    await this.flowerHistoryRepository.create({
+      flowerUserId: currentUser.userId, flowerContent: '무료 충전 광고열람보상', flowerValue: adInfo.adFlower, isFreeFlower: true,
+      flowerHistoryType: FlowerHistoryType.VIEW_AD, flowerHistoryRefer: adHistoryInfo.id,
+    });
     return {flower: adInfo.adFlower};
   }
 

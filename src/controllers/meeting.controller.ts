@@ -5,12 +5,11 @@ import {UserProfile} from '@loopback/security';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
-import {ChatType, ContactStatus, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
+import {ChatType, ContactStatus, FlowerHistoryType, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
 import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {FlowerController} from './flower.controller';
 import {Utils} from '../utils';
-import {MeetingProfile} from '../models';
 
 export class MeetingController {
   constructor(
@@ -49,6 +48,7 @@ export class MeetingController {
         if(myProfile[v.myStartKey] <= otherProfile[v.otherKey] && myProfile[v.myEndKey] >= otherProfile[v.otherKey]) matchCount++;
       }
     });
+    console.log(matchCount, 'matchCount');
     return matchCount;
   }
 
@@ -68,6 +68,7 @@ export class MeetingController {
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
       Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    console.log(R * c, 'Distance');
     return R * c;
   }
 
@@ -88,17 +89,17 @@ export class MeetingController {
     //인기순
     const popularList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
 
+    // 거리순
+    profileList.sort((a: any, b: any) => {
+      return (this.getDistance(myProfile, a) - this.getDistance(myProfile, b));
+    });
+    const nearList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
+
     // 매칭순
     profileList.sort((a: any, b: any) => {
       return (this.getMatchCount(myProfile, b) - this.getMatchCount(myProfile, a));
     });
     const matchList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
-    // 거리순
-    profileList.sort((a: any, b: any) => {
-      return (this.getDistance(myProfile, b) - this.getMatchCount(myProfile, a));
-    });
-    const nearList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
-    // 인기순
 
     // 접속한 회원 리스트
     const rooms: any = nspMain.adapter.rooms;
@@ -133,23 +134,6 @@ export class MeetingController {
     }
     const myMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: userId}});
-    if(!hasMeetingPass) {
-      const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, requestFlower);
-      await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
-      await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
-        flowerUserId: currentUser.userId,
-        flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 대화신청',
-        flowerValue: v.flowerValue,
-        isFreeFlower: v.isFreeFlower
-      })));
-    }
-    await this.notificationRepository.create({
-      notificationSendUserId: currentUser.userId,
-      notificationReceiveUserId: userId,
-      notificationMsg: myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.',
-      notificationType: NotificationType.CHAT_REQUEST,
-      notificationServiceType: ServiceType.MEETING,
-    });
     let chatContactInfo = await this.chatContactRepository.findOne({
       where: {
         or: [
@@ -167,6 +151,27 @@ export class MeetingController {
         contactServiceType: ServiceType.MEETING
       });
     }
+
+    if(!hasMeetingPass) {
+      const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, requestFlower);
+      await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
+      await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
+        flowerUserId: currentUser.userId,
+        flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 대화신청',
+        flowerValue: v.flowerValue,
+        isFreeFlower: v.isFreeFlower,
+        flowerHistoryType: FlowerHistoryType.REQUEST_CHAT,
+        flowerHistoryRefer: chatContactInfo?.id
+      })));
+    }
+    await this.notificationRepository.create({
+      notificationSendUserId: currentUser.userId,
+      notificationReceiveUserId: userId,
+      notificationMsg: myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.',
+      notificationType: NotificationType.CHAT_REQUEST,
+      notificationServiceType: ServiceType.MEETING,
+    });
+
     nspMain.to(userId).emit(MainSocketMsgType.SRV_REQUEST_CHAT, {
       callUserId: currentUser.userId,
       callUserName: myMeetingInfo?.meetingNickname,

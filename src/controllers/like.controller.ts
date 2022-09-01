@@ -4,7 +4,7 @@ import {FlowerHistoryRepository, LikeRepository, MeetingProfileRepository, UserR
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
-import {ServiceType, UserCredentials} from '../types';
+import {FlowerHistoryType, ServiceType, UserCredentials} from '../types';
 import {secured, SecuredType} from '../role-authentication';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace} from 'socket.io';
@@ -43,6 +43,11 @@ export class LikeController {
     });
     if (alreadyInfo) throw new HttpErrors.BadRequest('이미 좋아요 했습니다.');
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: otherUserId}});
+    const likeInfo = await this.likeRepository.create({
+      likeUserId: currentUser.userId,
+      likeOtherUserId: otherUserId,
+      likeServiceType: ServiceType.MEETING,
+    });
     if(!hasMeetingPass) {
       const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, likeFlower);
       await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
@@ -50,14 +55,12 @@ export class LikeController {
         flowerUserId: currentUser.userId,
         flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 좋아요함',
         flowerValue: v.flowerValue,
-        isFreeFlower: v.isFreeFlower
+        isFreeFlower: v.isFreeFlower,
+        flowerHistoryType: FlowerHistoryType.LIKE_USER,
+        flowerHistoryRefer: likeInfo.id,
       })))
     }
-    return this.likeRepository.create({
-      likeUserId: currentUser.userId,
-      likeOtherUserId: otherUserId,
-      likeServiceType: ServiceType.MEETING,
-    });
+    return likeInfo;
   }
 
   @get('/likes')

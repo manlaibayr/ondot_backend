@@ -61,7 +61,7 @@ export class User extends Entity {
       enum: Object.values(SignupType),
     },
   })
-  signupType: string;
+  signupType: SignupType;
 
   @property({
     type: 'string',

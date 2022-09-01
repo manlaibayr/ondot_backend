@@ -36,6 +36,23 @@ export enum SignupType {
   APPLE = 'apple',
 }
 
+export enum FlowerHistoryType {
+  ATTENDANCE = 'ATTENDANCE',    // 출석체크
+  VIEW_AD = 'VIEW_AD',    // 광고열람보상
+  FLOWER_CHARGE = 'FLOWER_CHARGE',      // 유료플라워 충전
+  GIVE_FLOWER = 'GIVE_FLOWER',   // 플라워선물보내기
+  RECEIVE_FLOWER = 'RECEIVE_FLOWER', // 플라워선물받기
+  SEND_GIFT = 'SEND_GIFT',    // 기프트보내기
+  CREATE_ROOM = 'CREATE_ROOM',  // 취미 방창조
+  RECREATE_ROOM = 'RECREATE_ROOM', // 취미 방 재개설
+  EXTEND_ROOM = 'EXTEND_ROOM', // 취미 방 기간 연장
+  LIKE_USER = 'LIKE_USER', // 좋아요,
+  REQUEST_CHAT = 'REQUEST_CHAT', // 대화신청
+  SEND_NOTE = 'SEND_NOTE', // 쪽지보냄
+  REMOVE_FREE = 'REMOVE_FREE',  // 3개월동안 이용안된 무료 포인트 삭제
+  NORMAL = 'NORMAL'
+}
+
 export enum ServiceType {
   MEETING = 'MEETING',
   LEARNING = 'LEARNING',

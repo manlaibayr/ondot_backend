@@ -2,7 +2,7 @@ import {repository} from '@loopback/repository';
 import {get, HttpErrors, param, post, requestBody} from '@loopback/rest';
 import {FlowerHistoryRepository, MeetingProfileRepository, NoteRepository, NotificationRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
-import {MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
+import {FlowerHistoryType, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
@@ -47,6 +47,11 @@ export class NoteController {
     }
     const meMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: data.otherId}});
+    const noteInfo = await this.noteRepository.create({
+      noteUserId: currentUser.userId,
+      noteOtherUserId: data.otherId,
+      noteMsg: data.text
+    });
     if(!hasMeetingPass) {
       const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, noteFlower);
       await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
@@ -54,14 +59,11 @@ export class NoteController {
         flowerUserId: currentUser.userId,
         flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 쪽지를 보냈습니다.',
         flowerValue: v.flowerValue,
-        isFreeFlower: v.isFreeFlower
+        isFreeFlower: v.isFreeFlower,
+        flowerHistoryType: FlowerHistoryType.SEND_NOTE,
+        flowerHistoryRefer: noteInfo.id
       })));
     }
-    const noteInfo = await this.noteRepository.create({
-      noteUserId: currentUser.userId,
-      noteOtherUserId: data.otherId,
-      noteMsg: data.text
-    });
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: data.otherId,

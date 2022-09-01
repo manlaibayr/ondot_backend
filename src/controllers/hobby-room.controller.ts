@@ -5,7 +5,7 @@ import {del, get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody
 import {Count, Filter, repository} from '@loopback/repository';
 import moment from 'moment';
 import {v4 as uuidv4} from 'uuid';
-import {ChatMsgType, ChatSocketMsgType, MainSocketMsgType, NotificationType, RoomMemberJoinType, RoomRoleType, ServiceType, UserCredentials, UserStatusType} from '../types';
+import {ChatMsgType, ChatSocketMsgType, FlowerHistoryType, MainSocketMsgType, NotificationType, RoomMemberJoinType, RoomRoleType, ServiceType, UserCredentials} from '../types';
 import {
   ChatGroupMsgRepository,
   FlowerHistoryRepository,
@@ -19,11 +19,10 @@ import {
   UserRepository,
 } from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
-import {GiftHistory, GiftHistoryWithRelations, HobbyRoom, HobbyRoomWithRelations} from '../models';
+import {HobbyRoom, HobbyRoomWithRelations} from '../models';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Server} from 'socket.io';
 import {Utils} from '../utils';
-import {CONFIG} from '../config';
 
 export class HobbyRoomController {
   constructor(
@@ -111,7 +110,9 @@ export class HobbyRoomController {
       flowerUserId: currentUser.userId,
       flowerContent: roomData.roomTitle + ' 취미 방 개설',
       flowerValue: v.flowerValue,
-      isFreeFlower: v.isFreeFlower
+      isFreeFlower: v.isFreeFlower,
+      flowerHistoryType: FlowerHistoryType.CREATE_ROOM,
+      flowerHistoryRefer: roomInfo.id
     })))
 
     return {id: roomInfo.id};
@@ -707,7 +708,9 @@ export class HobbyRoomController {
       flowerUserId: currentUser.userId,
       flowerContent: roomInfo.roomTitle + (isExtendRoom ? ' 취미 방 기간 연장' : ' 취미 방 재개설'),
       flowerValue: v.flowerValue,
-      isFreeFlower: v.isFreeFlower
+      isFreeFlower: v.isFreeFlower,
+      flowerHistoryType: (isExtendRoom ? FlowerHistoryType.EXTEND_ROOM : FlowerHistoryType.RECREATE_ROOM),
+      flowerHistoryRefer: roomId,
     })));
   }
 

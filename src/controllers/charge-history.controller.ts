@@ -6,7 +6,7 @@ import {UserProfile} from '@loopback/security';
 import axios from 'axios';
 import {ChargeHistory} from '../models';
 import {ChargeHistoryRepository, FlowerHistoryRepository, NotificationRepository, UserRepository} from '../repositories';
-import {ChargeStatus, UserCredentials} from '../types';
+import {ChargeStatus, FlowerHistoryType, UserCredentials} from '../types';
 import {secured, SecuredType} from '../role-authentication';
 import {CONFIG} from '../config';
 
@@ -48,26 +48,27 @@ export class ChargeHistoryController {
     // 결제 검증하기
     if (Number(data.amount) === paymentData.amount && data.merchant_uid === paymentData.merchant_uid) {
       switch (paymentData.status) {
-        case 'paid':
-          await Promise.all([
-            this.userRepository.updateById(currentUser.userId, {payFlower: currentUser.payFlower + Number(data.flower)}),
-            this.flowerHistoryRepository.create({
-              flowerUserId: currentUser.userId,
-              flowerContent: `${data.flower} 충전`,
-              flowerValue: data.flower,
-              isFreeFlower: false,
-            }),
-            this.chargeHistoryRepository.create({
-              chargeUserId: currentUser.userId,
-              impUid: data.imp_uid,
-              merchantUid: data.merchant_uid,
-              chargeAmount: data.amount,
-              chargeFlower: data.flower,
-              chargeDesc: paymentData.name,
-              chargeStatus: ChargeStatus.SUCCESS
-            }),
-          ])
+        case 'paid': {
+          await this.userRepository.updateById(currentUser.userId, {payFlower: currentUser.payFlower + Number(data.flower)});
+          const chargeHistoryInfo = await this.chargeHistoryRepository.create({
+            chargeUserId: currentUser.userId,
+            impUid: data.imp_uid,
+            merchantUid: data.merchant_uid,
+            chargeAmount: data.amount,
+            chargeFlower: data.flower,
+            chargeDesc: paymentData.name,
+            chargeStatus: ChargeStatus.SUCCESS
+          });
+          await this.flowerHistoryRepository.create({
+            flowerUserId: currentUser.userId,
+            flowerContent: `${data.flower} 충전`,
+            flowerValue: data.flower,
+            isFreeFlower: false,
+            flowerHistoryType: FlowerHistoryType.FLOWER_CHARGE,
+            flowerHistoryRefer: chargeHistoryInfo.id,
+          });
           break;
+        }
         default:
           throw new HttpErrors.BadRequest('정확하지 않은 결제요청');
       }

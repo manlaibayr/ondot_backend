@@ -5,7 +5,7 @@ import {secured, SecuredType} from '../role-authentication';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
-import {ServiceType, UserCredentials} from '../types';
+import {FlowerHistoryType, ServiceType, UserCredentials} from '../types';
 import moment from 'moment';
 import {Utils} from '../utils';
 
@@ -71,8 +71,8 @@ export class FlowerController {
       this.userRepository.updateById(currentUser.userId, {payFlower: currentUser.payFlower - data.flower}),
       this.userRepository.updateById(data.otherUserId, {payFlower: otherUserInfo.payFlower + data.flower}),
       this.flowerHistoryRepository.createAll([
-        {flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함', flowerValue: -data.flower},
-        {flowerUserId: data.otherUserId, flowerContent: userMeetingProfile?.meetingNickname + '님에게서 선물을 받음', flowerValue: data.flower},
+        {flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함', flowerValue: -data.flower, flowerHistoryType: FlowerHistoryType.GIVE_FLOWER},
+        {flowerUserId: data.otherUserId, flowerContent: userMeetingProfile?.meetingNickname + '님에게서 선물을 받음', flowerValue: data.flower, flowerHistoryType: FlowerHistoryType.RECEIVE_FLOWER},
       ]),
     ]);
     return {payFlower: currentUser.payFlower - data.flower};

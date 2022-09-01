@@ -1,4 +1,5 @@
 import {Entity, model, property} from '@loopback/repository';
+import {FlowerHistoryType} from '../types';
 
 @model({settings: {mysql: {table: 'flower_history'}}})
 export class FlowerHistory extends Entity {
@@ -32,6 +33,20 @@ export class FlowerHistory extends Entity {
     default: true,
   })
   isFreeFlower: boolean;
+
+  @property({
+    type: 'string',
+    required: true,
+    jsonSchema: {
+      enum: Object.values(FlowerHistoryType),
+    },
+  })
+  flowerHistoryType: FlowerHistoryType;
+
+  @property({
+    type: 'string',
+  })
+  flowerHistoryRefer: string;
 
   @property({
     type: 'date',

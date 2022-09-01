@@ -156,6 +156,8 @@ export class ChatController {
     totalHobbyContactList.sort((x: any, y: any) => {
       return x.lastChatTime < y.lastChatTime ? -1 : x.lastChatTime > y.lastChatTime ? 1 : 0;
     });
+    meetingContacts.sort((a: any, b: any) => (moment(b.lastChatTime).isSame(a.lastChatTime)) ? 0 : ((moment(b.lastChatTime).isAfter(a.lastChatTime)) ? 1 : -1));
+    totalHobbyContactList.sort((a: any, b: any) => (moment(b.lastChatTime).isSame(a.lastChatTime)) ? 0 : ((moment(b.lastChatTime).isAfter(a.lastChatTime)) ? 1 : -1));
     return {meeting: meetingContacts, hobby: totalHobbyContactList};
   }
 

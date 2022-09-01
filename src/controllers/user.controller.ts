@@ -1,20 +1,24 @@
 import {get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody, response, Response, RestBindings} from '@loopback/rest';
 import {Count, Filter, repository} from '@loopback/repository';
 import {Getter, inject} from '@loopback/core';
-import {HobbyProfileRepository, MeetingProfileRepository, RolemappingRepository, UserRepository, VerifyCodeRepository, VerifytokenRepository} from '../repositories';
-import {promisify} from 'util';
-import uid from 'uid2';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
+import {promisify} from 'util';
+import uid from 'uid2';
 import axios from 'axios';
 import {OAuth2Client} from 'google-auth-library';
+import moment from 'moment';
+import jwt from 'jsonwebtoken'
+import AppleAuth from 'apple-auth';
+import fs from 'fs-extra';
+import path from 'path';
 import {CONFIG} from '../config';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
 import {FileUploadHandler, SignupType, UserCredentials, UserStatusType, UserType} from '../types';
+import {HobbyProfileRepository, MeetingProfileRepository, RolemappingRepository, UserRepository, VerifyCodeRepository, VerifytokenRepository} from '../repositories';
 import {User, UserRelations, UserWithRelations} from '../models';
 import {VerifyCodeController} from './verify-code.controller';
-import moment from 'moment';
 
 const {sign} = require('jsonwebtoken');
 const signAsync = promisify(sign);
@@ -86,6 +90,23 @@ export class UserController {
         };
       } else {
         throw new HttpErrors.BadRequest('Google 토큰이 정확하지 않습니다.');
+      }
+    } else if (type === SignupType.APPLE) {
+      const config = {
+        ...CONFIG.appleSignupConfig,
+        client_id: data.device === 'WEB' ? CONFIG.appleClientIfForWeb : CONFIG.appleClientIdForApp
+      }
+      const appleAuth = new AppleAuth(
+        config,
+        CONFIG.appleAuthKey,
+        'text'
+      );
+      const appleResp = await appleAuth.accessToken(data.authorizationCode);
+      const appleData: any = jwt.decode(appleResp.id_token);
+      return {
+        signupType: SignupType.APPLE,
+        email: appleData.email,
+        name: appleData.name,
       }
     } else {
       throw new HttpErrors.BadRequest('파라미터가 정확하지 않습니다.');
@@ -237,7 +258,9 @@ export class UserController {
       profile: {
         meeting: profileMeeting,
         hobby: profileHobby,
-      }
+      },
+      availableLearning: false,
+      availableCharge: false,
     };
   }
 
@@ -338,7 +361,7 @@ export class UserController {
   async userList(
     @param.query.number('page') page: number,
     @param.query.number('count') pageCount: number,
-    @param.query.object('search') searchParam?: {text?: string, signupType?: string, userStatus?: UserStatusType},
+    @param.query.object('search') searchParam?: {text?: string, signupType?: SignupType, userStatus?: UserStatusType},
     @param.query.object('sort') sortParam?: {field: string, asc: boolean},
   ) {
     if (page < 1) throw new HttpErrors.BadRequest('param is not correct');
