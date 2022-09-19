@@ -101,7 +101,7 @@ export class User extends Entity {
 
   @property({
     type: 'number',
-    default: 1000,
+    default: 0,
   })
   payFlower: number;
 

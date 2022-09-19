@@ -23,3 +23,4 @@ export * from './ranking-user.controller';
 export * from './charge-history.controller';
 export * from './gift-goods.controller';
 export * from './learning-profile.controller';
+export * from './learning-review.controller';

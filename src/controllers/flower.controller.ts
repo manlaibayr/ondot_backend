@@ -21,8 +21,20 @@ export class FlowerController {
   }
 
   async hasUsagePass(userId: string, serviceType: ServiceType) {
-    const count = await this.usagePassRepository.count({passUserId: userId, passExpireDate: {gte: moment().toDate()}});
+    const count = await this.usagePassRepository.count({passUserId: userId, passServiceType: serviceType, passExpireDate: {gte: moment().toDate()}});
     return count.count > 0;
+  }
+
+  @get('/flowers/paid-histories')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async paidFlowerHistory() {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const flowerHistory = await this.flowerHistoryRepository.find({where: {flowerUserId: currentUser.userId, isFreeFlower: false}, order: ['createdAt desc']});
+    return {
+      flower: currentUser.payFlower,
+      history: flowerHistory.map((v) => ({id: v.id, content: v.flowerContent, value: v.flowerValue, createdAt: v.createdAt}))
+    };
+
   }
 
   @get('/flowers/histories')
@@ -30,7 +42,7 @@ export class FlowerController {
   async historyList() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const userInfo = await this.userRepository.findById(currentUser.userId);
-    const flowerHistory = await this.flowerHistoryRepository.find({where: {flowerUserId: currentUser.userId}, order: ['createdAt asc']});
+    const flowerHistory = await this.flowerHistoryRepository.find({where: {flowerUserId: currentUser.userId}, order: ['createdAt desc']});
     const usagePassList = await this.usagePassRepository.find({
       where: {passUserId: currentUser.userId, passExpireDate: {gte: moment().toDate()}},
       order: ['passExpireDate desc'],
@@ -115,7 +127,8 @@ export class FlowerController {
         flowerUserId: currentUser.userId,
         flowerContent: `${serviceType} ${passReqInfo.label} 이용권 구매`,
         flowerValue: v.flowerValue,
-        isFreeFlower: v.isFreeFlower
+        isFreeFlower: v.isFreeFlower,
+        flowerHistoryType: FlowerHistoryType.PASS_PURCHASE,
       }))),
       this.usagePassRepository.create({
         passUserId: currentUser.userId,

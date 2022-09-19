@@ -178,14 +178,14 @@ export class GiftGoodsController {
       })
     ]);
     await this.flowerHistoryRepository.create({
-      flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함',
+      flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + `님에게 상품 ${giftingInfo.goods_nm}을 선물함`,
       flowerValue: -giftingFlower, isFreeFlower: false,
       flowerHistoryType: FlowerHistoryType.SEND_GIFT,
       flowerHistoryRefer: giftHistoryInfo.id,
     });
     nspMain.to(otherUserId).emit(MainSocketMsgType.SRV_NOTIFICATION, {
       title: '선물을 받았습니다.',
-      msg: userMeetingProfile?.meetingNickname + `님에게서 선물(${giftingInfo.goods_nm})을 받았습니다.`,
+      msg: userMeetingProfile?.meetingNickname + `님에게서 상품(${giftingInfo.goods_nm})을 받았습니다.`,
       icon: userMeetingProfile?.meetingPhotoMain,
     });
     return {payFlower: userInfo.payFlower - giftingFlower};

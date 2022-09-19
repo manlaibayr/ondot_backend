@@ -50,6 +50,8 @@ export enum FlowerHistoryType {
   REQUEST_CHAT = 'REQUEST_CHAT', // 대화신청
   SEND_NOTE = 'SEND_NOTE', // 쪽지보냄
   REMOVE_FREE = 'REMOVE_FREE',  // 3개월동안 이용안된 무료 포인트 삭제
+  TEACHER_REVIEW = 'TEACHER_REVIEW', // 선생의 후기작성 보상
+  PASS_PURCHASE = 'PASS_PURCHASE', // 이용권구매
   NORMAL = 'NORMAL'
 }
 

@@ -13,7 +13,7 @@ import {
   ChatMsgRepository,
   HobbyProfileRepository,
   HobbyRoomMemberRepository,
-  HobbyRoomRepository,
+  HobbyRoomRepository, LearningProfileRepository,
   MeetingProfileRepository,
   UserRepository,
   VerifytokenRepository,
@@ -43,6 +43,7 @@ export class ChatControllerWs {
     @repository(MeetingProfileRepository) private meetingProfileRepository: MeetingProfileRepository,
     @repository(BlockUserRepository) private blockUserRepository: BlockUserRepository,
     @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
+    @repository(LearningProfileRepository) private learningProfileRepository: LearningProfileRepository,
     @repository(ChatGroupMsgRepository) private chatGroupMsgRepository: ChatGroupMsgRepository,
     @repository(HobbyRoomMemberRepository) private hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @repository(HobbyRoomRepository) private hobbyRoomRepository: HobbyRoomRepository,
@@ -78,6 +79,22 @@ export class ChatControllerWs {
       const meBlock = await this.blockUserRepository.findOne({where: {blockUserId: otherUserId, blockOtherUserId: userId, blockServiceType: ServiceType.HOBBY}});
       const meInfo = {id: meProfile.userId, profile: meProfile.hobbyPhoto, nickname: meProfile.hobbyNickname};
       const otherInfo = {id: otherProfile?.userId, profile: otherProfile?.hobbyPhoto, nickname: otherProfile?.hobbyNickname, isBlock: !!otherBlock};
+      return {
+        meProfile: meInfo,
+        otherProfile: otherInfo,
+        waitAllowRequest: contactInfo.contactOtherUserId === userId && contactInfo.contactStatus === ContactStatus.REQUEST,
+        otherDeleted: !!meBlock || (contactInfo.contactUserId === userId ? (contactInfo.contactOtherStatus === ContactStatus.DELETE) : (contactInfo.contactStatus === ContactStatus.DELETE)),
+      };
+    } else if(chatType === ChatType.LEARNING_CHAT) {
+      const [meProfile, otherProfile] = await Promise.all([
+        this.learningProfileRepository.findOne({where: {userId: userId}}),
+        this.learningProfileRepository.findOne({where: {userId: otherUserId}}),
+      ]);
+      if (!meProfile || !otherProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
+      const otherBlock = await this.blockUserRepository.findOne({where: {blockUserId: userId, blockOtherUserId: otherUserId, blockServiceType: ServiceType.LEARNING}});
+      const meBlock = await this.blockUserRepository.findOne({where: {blockUserId: otherUserId, blockOtherUserId: userId, blockServiceType: ServiceType.LEARNING}});
+      const meInfo = {id: meProfile.userId, profile: meProfile.tchProfileMainPhoto, nickname: meProfile.learningNickname};
+      const otherInfo = {id: otherProfile?.userId, profile: otherProfile?.tchProfileMainPhoto, nickname: otherProfile?.learningNickname, isBlock: !!otherBlock};
       return {
         meProfile: meInfo,
         otherProfile: otherInfo,

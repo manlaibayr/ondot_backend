@@ -34,3 +34,5 @@ export * from './gift-goods.model';
 export * from './gift-history.model';
 export * from './usage-pass.model';
 export * from './learning-profile.model';
+export * from './learning-dibs.model';
+export * from './learning-review.model';

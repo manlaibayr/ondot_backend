@@ -1,4 +1,5 @@
 import {Entity, model, property} from '@loopback/repository';
+import {ServiceType} from '../types';
 
 @model()
 export class Note extends Entity {
@@ -31,6 +32,15 @@ export class Note extends Entity {
     type: 'string',
   })
   noteAnswerMsg: string;
+
+  @property({
+    type: 'string',
+    required: true,
+    jsonSchema: {
+      enum: Object.values(ServiceType)
+    }
+  })
+  noteServiceType: ServiceType;
 
   @property({
     type: 'date',

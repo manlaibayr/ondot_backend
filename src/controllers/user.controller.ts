@@ -8,15 +8,13 @@ import uid from 'uid2';
 import axios from 'axios';
 import {OAuth2Client} from 'google-auth-library';
 import moment from 'moment';
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
 import AppleAuth from 'apple-auth';
-import fs from 'fs-extra';
-import path from 'path';
 import {CONFIG} from '../config';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
 import {FileUploadHandler, SignupType, UserCredentials, UserStatusType, UserType} from '../types';
-import {HobbyProfileRepository, MeetingProfileRepository, RolemappingRepository, UserRepository, VerifyCodeRepository, VerifytokenRepository} from '../repositories';
+import {HobbyProfileRepository, LearningProfileRepository, MeetingProfileRepository, RolemappingRepository, UserRepository, VerifyCodeRepository, VerifytokenRepository} from '../repositories';
 import {User, UserRelations, UserWithRelations} from '../models';
 import {VerifyCodeController} from './verify-code.controller';
 
@@ -34,6 +32,7 @@ export class UserController {
     @repository(VerifyCodeRepository) private verifyCodeRepository: VerifyCodeRepository,
     @repository(MeetingProfileRepository) private profileMeetingRepository: MeetingProfileRepository,
     @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
+    @repository(LearningProfileRepository) private learningProfileRepository: LearningProfileRepository,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
@@ -67,7 +66,7 @@ export class UserController {
         nickname: naverUserInfo.nickname,
         gender: naverUserInfo.gender,
         birthday: naverUserInfo.birthday,
-        age: naverUserInfo.birthday ? moment().diff(moment(naverUserInfo.birthday, "YYYYMMDD"), 'years') : 0
+        age: naverUserInfo.birthday ? moment().diff(moment(naverUserInfo.birthday, 'YYYYMMDD'), 'years') : 0,
       };
     } else if (type === SignupType.KAKAO) {
       const kakaoResp = await axios.get('https://kapi.kakao.com/v2/user/me', {headers: {'Authorization': 'Bearer ' + data.accessToken}});
@@ -94,12 +93,12 @@ export class UserController {
     } else if (type === SignupType.APPLE) {
       const config = {
         ...CONFIG.appleSignupConfig,
-        client_id: data.device === 'WEB' ? CONFIG.appleClientIfForWeb : CONFIG.appleClientIdForApp
-      }
+        client_id: data.device === 'WEB' ? CONFIG.appleClientIfForWeb : CONFIG.appleClientIdForApp,
+      };
       const appleAuth = new AppleAuth(
         config,
         CONFIG.appleAuthKey,
-        'text'
+        'text',
       );
       const appleResp = await appleAuth.accessToken(data.authorizationCode);
       const appleData: any = jwt.decode(appleResp.id_token);
@@ -107,7 +106,7 @@ export class UserController {
         signupType: SignupType.APPLE,
         email: appleData.email,
         name: appleData.name,
-      }
+      };
     } else {
       throw new HttpErrors.BadRequest('파라미터가 정확하지 않습니다.');
     }
@@ -136,13 +135,15 @@ export class UserController {
     }
     const niceInfo = VerifyCodeController.getNicePhoneNumber(
       signUpInfo.niceAuthResp.tokenVersionId, signUpInfo.niceAuthResp.encData, signUpInfo.niceAuthResp.integrityValue, signUpInfo.niceAuthResp.token);
-    const checkRealUserInfo = await this.userRepository.findOne({where:{realUserId: niceInfo.realUserId}});
-    if(checkRealUserInfo) {
-        if(checkRealUserInfo.signupType === signUpInfo.type) {
-          throw new HttpErrors.BadRequest(niceInfo.name + `님은 이미 ${checkRealUserInfo.email}으로 이미 가입이 되있으십니다.`);
-        } else {
-          return {result: 'existEmail', data: {userId: checkRealUserInfo.id, email: checkRealUserInfo.email, signupType: checkRealUserInfo.signupType}}
-        }
+    const checkRealUserInfo = await this.userRepository.findOne({where: {realUserId: niceInfo.realUserId}});
+    if (checkRealUserInfo) {
+      if(checkRealUserInfo.userStatus === UserStatusType.LEAVE) {
+        throw new HttpErrors.BadRequest('이미 삭제된 계정입니다. 다시 가입하시려면 관리자에게 문의하세요.');
+      } else if (checkRealUserInfo.signupType === signUpInfo.type) {
+        throw new HttpErrors.BadRequest(niceInfo.name + `님은 이미 ${checkRealUserInfo.email}으로 이미 가입이 되있으십니다.`);
+      } else {
+        return {result: 'existEmail', data: {userId: checkRealUserInfo.id, email: checkRealUserInfo.email, signupType: checkRealUserInfo.signupType}};
+      }
     }
     signUpInfo.phoneNumber = niceInfo.phoneNumber;
     const userInfo = await this.userRepository.create({
@@ -152,7 +153,7 @@ export class UserController {
       realUserId: niceInfo.realUserId,
       sex: niceInfo.sex,
       birthday: niceInfo.birthday,
-      age: niceInfo.birthday ? moment().diff(moment(niceInfo.birthday, "YYYYMMDD"), 'years') : 0,
+      age: niceInfo.birthday ? moment().diff(moment(niceInfo.birthday, 'YYYYMMDD'), 'years') : 0,
       isForeign: niceInfo.isForeign,
       signupType: userData.signupType,
       phoneNumber: signUpInfo.phoneNumber,
@@ -173,7 +174,7 @@ export class UserController {
     let user: (User & UserRelations) | null;
     if (loginInfo.username && loginInfo.password) {
       if (!loginInfo.username || !loginInfo.password) throw new HttpErrors.BadRequest('아이디나 암호가 정확하지 않습니다.');
-      user = await this.userRepository.findOne({where: {or: [{username: loginInfo.username}, {email: loginInfo.username}], signupType: SignupType.EMAIL}});
+      user = await this.userRepository.findOne({where: {or: [{username: loginInfo.username}, {email: loginInfo.username}], signupType: SignupType.EMAIL, userStatus: UserStatusType.NORMAL}});
       if (!user) throw new HttpErrors.Unauthorized('Invalid credentials');
       const isPasswordMatched = this.checkPassword(user.password, loginInfo.password);
       if (!isPasswordMatched) throw new HttpErrors.Unauthorized('아이디나 암호가 정확하지 않습니다.');
@@ -183,7 +184,7 @@ export class UserController {
       }
     } else if (loginInfo.thirdTokenData) {
       const thirdUserInfo = await this.thirdUserInfo(loginInfo.thirdTokenData.type, loginInfo.thirdTokenData.data);
-      user = await this.userRepository.findOne({where: {email: thirdUserInfo.email, signupType: thirdUserInfo.signupType}});
+      user = await this.userRepository.findOne({where: {email: thirdUserInfo.email, signupType: thirdUserInfo.signupType, userStatus: UserStatusType.NORMAL}});
       if (!user) throw new HttpErrors.Unauthorized('Invalid credentials');
     } else {
       throw new HttpErrors.BadRequest('잘못된 요청입니다.');
@@ -218,10 +219,10 @@ export class UserController {
     const findInfo = await this.userRepository.findOne({where: {email: userInfo.email}});
     if (findInfo) {
       // 이미 로그인된 계정, 로그인으로 이동
-      if(findInfo.signupType === userInfo.signupType) {
+      if (findInfo.signupType === userInfo.signupType) {
         return {result: 'login'};
       } else {
-        return {result: 'existEmail', data: {userId: findInfo.id, email: userInfo.email, signupType: findInfo.signupType}}
+        return {result: 'existEmail', data: {userId: findInfo.id, email: userInfo.email, signupType: findInfo.signupType}};
       }
     } else {
       // 새로 추가되어야 하는 계정
@@ -247,6 +248,7 @@ export class UserController {
     const userInfo = await this.userRepository.findById(currentUser.userId);
     const profileMeeting = await this.profileMeetingRepository.findOne({where: {userId: currentUser.userId}});
     const profileHobby = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
+    const profileLearning = await this.learningProfileRepository.findOne({where: {userId: currentUser.userId}});
     return {
       id: userInfo.id,
       username: userInfo.username,
@@ -258,8 +260,10 @@ export class UserController {
       profile: {
         meeting: profileMeeting,
         hobby: profileHobby,
+        learning: profileLearning,
       },
-      availableLearning: false,
+      availableLearning: true,
+      availableGift: false,
       availableCharge: false,
     };
   }
@@ -347,10 +351,18 @@ export class UserController {
   ) {
     const thirdUserInfo = await this.thirdUserInfo(data.thirdTokenData.type, data.thirdTokenData.data);
     const userInfo = await this.userRepository.findById(data.userId);
-    if(userInfo.email === thirdUserInfo.email && userInfo.signupType !== thirdUserInfo.signupType) {
+    if (userInfo.email === thirdUserInfo.email && userInfo.signupType !== thirdUserInfo.signupType) {
       await this.userRepository.updateById(data.userId, {signupType: thirdUserInfo.signupType});
     }
   }
+
+  @get('/users/remove')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async userRemove() {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    await this.userRepository.updateById(currentUser.userId, {userStatus: UserStatusType.LEAVE});
+  }
+
 
   //*========== admin functions ==========*//
   @get('/users')
@@ -368,14 +380,14 @@ export class UserController {
     const filter: Filter<User> = {};
 
     filter.where = {and: []};
-    if(searchParam?.signupType) filter.where.and.push({signupType: searchParam.signupType});
-    if(searchParam?.userStatus) filter.where.and.push({userStatus: searchParam.userStatus})
-    if(searchParam?.text) {
+    if (searchParam?.signupType) filter.where.and.push({signupType: searchParam.signupType});
+    if (searchParam?.userStatus) filter.where.and.push({userStatus: searchParam.userStatus});
+    if (searchParam?.text) {
       filter.where.and.push({
-        or: [{username: {like: `%${searchParam.text}%`}}, {email: {like: `%${searchParam.text}%`}}]
-      })
+        or: [{username: {like: `%${searchParam.text}%`}}, {email: {like: `%${searchParam.text}%`}}],
+      });
     }
-    if(filter.where.and.length === 0) {
+    if (filter.where.and.length === 0) {
       filter.where = {};
     }
 

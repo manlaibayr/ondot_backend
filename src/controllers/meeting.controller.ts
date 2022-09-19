@@ -48,7 +48,6 @@ export class MeetingController {
         if(myProfile[v.myStartKey] <= otherProfile[v.otherKey] && myProfile[v.myEndKey] >= otherProfile[v.otherKey]) matchCount++;
       }
     });
-    console.log(matchCount, 'matchCount');
     return matchCount;
   }
 
@@ -68,7 +67,6 @@ export class MeetingController {
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
       Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    console.log(R * c, 'Distance');
     return R * c;
   }
 
@@ -86,6 +84,16 @@ export class MeetingController {
     blokcIds.push(currentUser.userId);
     const profileList = await this.meetingProfileRepository.find({where: {userId: {nin: blokcIds}}});
 
+    // 접속한 회원 리스트
+    const rooms: any = nspMain.adapter.rooms;
+    const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
+    profileList.forEach((v: any) => {
+      v.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
+      // const info: any = v.toJSON();
+      // info.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
+      // profileList.push(info);
+    });
+
     //인기순
     const popularList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
 
@@ -101,14 +109,6 @@ export class MeetingController {
     });
     const matchList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
 
-    // 접속한 회원 리스트
-    const rooms: any = nspMain.adapter.rooms;
-    const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
-    profileList.forEach((v) => {
-      const info: any = v.toJSON();
-      info.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
-      profileList.push(info);
-    });
 
     const data = {
       meetingProfile: myProfile,

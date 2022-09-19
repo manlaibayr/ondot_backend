@@ -34,3 +34,5 @@ export * from './gift-goods.repository';
 export * from './gift-history.repository';
 export * from './usage-pass.repository';
 export * from './learning-profile.repository';
+export * from './learning-dibs.repository';
+export * from './learning-review.repository';
