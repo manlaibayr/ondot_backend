@@ -6,8 +6,18 @@ import {Filter, repository} from '@loopback/repository';
 import moment from 'moment';
 import {secured, SecuredType} from '../role-authentication';
 import {RankingType, ServiceType, UserCredentials} from '../types';
-import {RankingUser} from '../models';
-import {ChatContactRepository, HobbyRoomRepository, LikeRepository, RankingUserRepository, RatingRepository, UserRepository, VisitRepository} from '../repositories';
+import {LearningProfile, LearningQuestionComment, LearningReview, RankingUser} from '../models';
+import {
+  AttendanceRepository,
+  ChatContactRepository,
+  HobbyRoomRepository,
+  LearningProfileRepository, LearningQuestionCommentRepository, LearningQuestionRepository, LearningReviewRepository,
+  LikeRepository,
+  RankingUserRepository,
+  RatingRepository,
+  UserRepository,
+  VisitRepository,
+} from '../repositories';
 
 export class RankingUserController {
   constructor(
@@ -18,6 +28,11 @@ export class RankingUserController {
     @repository(RatingRepository) public ratingRepository: RatingRepository,
     @repository(VisitRepository) public visitRepository: VisitRepository,
     @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
+    @repository(LearningProfileRepository) public learningProfileRepository: LearningProfileRepository,
+    @repository(AttendanceRepository) public attendanceRepository: AttendanceRepository,
+    @repository(LearningQuestionRepository) public learningQuestionRepository: LearningQuestionRepository,
+    @repository(LearningQuestionCommentRepository) public learningQuestionCommentRepository: LearningQuestionCommentRepository,
+    @repository(LearningReviewRepository) public learningReviewRepository: LearningReviewRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
@@ -72,6 +87,32 @@ export class RankingUserController {
   private async calcHobbyRoomRanking() {
     const hobbyRoomList = await this.hobbyRoomRepository.find({where: {isRoomDelete: false}, order: ['roomMemberNumber desc'], limit: 10});
     return hobbyRoomList.map((v) => ({roomId: v.id, ranking: v.roomMemberNumber}));
+  }
+
+  private async calcUserLearningMonthFavor(userId: string, startDate: Date, endDate: Date) {
+    const userInfo = await this.userRepository.findById(userId);
+    if (!userInfo.learningProfileId) return null;
+    const data = {
+      attendance: 0,
+      question: 0,
+      questionComment: 0,
+      thumb: 0,
+      review: 0,
+      sum: 0,
+    };
+    const learningProfile = await this.learningProfileRepository.findById(userInfo.learningProfileId);
+    const attendanceCount = await this.attendanceRepository.count({attendanceUserId: userId, createdAt: {between: [startDate, endDate]}});
+    data.attendance = Math.min(attendanceCount.count * 5, 100);
+    const questionCount = await this.learningQuestionRepository.count({questionUserId: userId, createdAt: {between: [startDate, endDate]}});
+    data.question = Math.min(questionCount.count * 5, 100);
+    const questionCommentList = await this.learningQuestionCommentRepository.find({where: {commentUserId: userId, createdAt: {between: [startDate, endDate]}}});
+    data.questionComment = Math.min(questionCommentList.length * 10, 100);
+    const commentThumbCount = questionCommentList.reduce((acc: number, v: LearningQuestionComment) => (acc + (v.commentThumbCount || 0)) , 0);
+    data.thumb = Math.min(commentThumbCount * 10, 100);
+    const reviewList = await this.learningReviewRepository.find({where: {reviewTeacherUserId: userId, createdAt: {between: [startDate, endDate]}}});
+    data.review = reviewList.length === 0 ? 0 : Math.floor((reviewList.reduce((acc: number, v: LearningReview) => (v.reviewValue || 0) * 20, 0)) / reviewList.length);
+    data.sum = data.attendance + data.question + data.questionComment + data.thumb + data.review;
+    return data;
   }
 
   @get('/ranking-users/calc')
@@ -141,9 +182,9 @@ export class RankingUserController {
     await this.rankingUserRepository.createAll(rankingList);
   }
 
-  @get('/ranking-users/my-favor')
+  @get('/ranking-users/meeting-favor')
   @secured(SecuredType.IS_AUTHENTICATED)
-  async myFavorInfo() {
+  async meetingFavorInfo() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const userInfo = await this.userRepository.findById(currentUser.userId);
     const {rankingDate} = this.getRankingDate(RankingType.MONTH);
@@ -176,6 +217,45 @@ export class RankingUserController {
         like: favorInfo.like,
         contact: favorInfo.contact,
         rating: favorInfo.averageRating,
+      },
+    };
+  }
+
+  @get('/ranking-users/learning-favor')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async learningFavorInfo() {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const userInfo = await this.userRepository.findById(currentUser.userId);
+    const {rankingDate} = this.getRankingDate(RankingType.MONTH);
+    const favorInfo = await this.calcUserLearningMonthFavor(currentUser.userId, moment().startOf('week').toDate(), moment().toDate());
+    if (!favorInfo) throw new HttpErrors.BadRequest('러닝 프로필이 존재하지 않습니다.');
+    const sexRatingList = await this.rankingUserRepository.find({
+      where: {rankingServiceType: ServiceType.LEARNING, rankingType: RankingType.MONTH_RATING, rankingDate, rankingSex: userInfo.sex},
+      fields: ['rankingValue'],
+    });
+    const sexSumRating = sexRatingList.reduce((acc, cur) => acc + cur.rankingValue, 0);
+    const lastMonthRating = await this.rankingUserRepository.findOne({
+      where: {
+        rankingUserId: currentUser.userId,
+        rankingServiceType: ServiceType.LEARNING,
+        rankingType: RankingType.MONTH_RATING,
+        rankingDate,
+      },
+    });
+    const allFavorList = await this.rankingUserRepository.find({where: {rankingType: RankingType.MONTH, rankingServiceType: ServiceType.LEARNING, rankingDate}, order: ['rankingValue desc']});
+    const myFavorInfoIndex = allFavorList.findIndex((v) => v.rankingUserId === currentUser.userId);
+    const favorPercentage = (allFavorList.length === 0 || myFavorInfoIndex === -1) ? 100 : Number((myFavorInfoIndex / allFavorList.length).toFixed(2)) * 100;
+    return {
+      sex: userInfo.sex ? '남성' : '여성',
+      sexAvgRating: sexRatingList.length === 0 ? 0 : Number((sexSumRating / sexRatingList.length).toFixed(2)),
+      lastMonthRating: lastMonthRating ? lastMonthRating.rankingValue : 0,
+      favorPercentage,
+      currentMonth: {
+        attendance: favorInfo.attendance,
+        question: favorInfo.question,
+        questionComment: favorInfo.questionComment,
+        thumb: favorInfo.thumb,
+        review: favorInfo.review,
       },
     };
   }

@@ -6,6 +6,7 @@ import {BlockPhoneRepository, BlockUserRepository, UserRepository} from '../repo
 import {secured, SecuredType} from '../role-authentication';
 import {get, param, post, requestBody} from '@loopback/rest';
 import {LearningProfileType, ServiceType, UserCredentials} from '../types';
+import {LearningProfileController} from './learning-profile.controller';
 
 export class BlockController {
   constructor(
@@ -48,25 +49,29 @@ export class BlockController {
         isOnline: false,
         blockId: v.id,
         userId: v.blockOtherUserId,
-        profileId: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.id : (serviceType === ServiceType.HOBBY ? v.blockHobbyProfile?.id : v.blockLearningProfile?.id),
-        profile: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.meetingPhotoMain : (serviceType === ServiceType.HOBBY ? v.blockHobbyProfile?.hobbyPhoto : v.blockLearningProfile?.tchProfileMainPhoto),
-        nickname: serviceType === ServiceType.MEETING ? v.blockMeetingProfile?.meetingNickname : (serviceType === ServiceType.HOBBY ? v.blockHobbyProfile?.hobbyNickname : v.blockLearningProfile?.learningNickname),
-        desc: '',
       }
       if(serviceType === ServiceType.MEETING) {
+        item.profileId = v.blockMeetingProfile?.id;
+        item.profile = v.blockMeetingProfile?.meetingPhotoMain;
+        item.nickname = v.blockMeetingProfile?.meetingNickname;
         item.desc = `${v.blockMeetingProfile?.meetingJob} • ${v.blockMeetingProfile?.meetingOtherMeeting} • ${v.blockMeetingProfile?.meetingResidence?.split(" ")[0]}`;
       } else if(serviceType === ServiceType.HOBBY) {
+        item.profileId = v.blockHobbyProfile?.id;
+        item.profile = v.blockHobbyProfile?.hobbyPhoto;
+        item.nickname = v.blockHobbyProfile?.hobbyNickname;
         item.desc = v.blockHobbyProfile?.hobbyResidence;
       } else if(serviceType === ServiceType.LEARNING) {
+        item.profileId = v.blockLearningProfile?.id;
         item.learningProfileType = v.blockLearningProfile?.learningProfileType;
+        item.profile = LearningProfileController.getStudentProfile(v.blockLearningProfile);
+        item.nickname = v.blockLearningProfile?.learningNickname;
         if(v.blockLearningProfile?.learningProfileType === LearningProfileType.STUDENT) {
           item.desc = `${v.blockLearningProfile?.stuStatus} • ${v.blockLearningProfile?.sex}`;
-          item.stuStatus = v.blockLearningProfile?.stuStatus;
-          item.sex = v.blockLearningProfile?.sex;
         } else {
           item.desc = `선생님 • ${v.blockLearningProfile?.sex}`;
         }
       }
+      return item;
     });
   }
 

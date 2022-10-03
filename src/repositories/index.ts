@@ -36,3 +36,7 @@ export * from './usage-pass.repository';
 export * from './learning-profile.repository';
 export * from './learning-dibs.repository';
 export * from './learning-review.repository';
+export * from './learning-question-comment-thumb.repository';
+export * from './learning-question-comment.repository';
+export * from './learning-question.repository';
+export * from './store-product.repository';

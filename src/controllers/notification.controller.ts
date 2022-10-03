@@ -12,6 +12,7 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {ServiceType, UserCredentials} from '../types';
 import {NotificationWithRelations} from '../models';
+import {LearningProfileController} from './learning-profile.controller';
 
 export class NotificationController {
   constructor(
@@ -30,8 +31,7 @@ export class NotificationController {
       include: [{relation: "senderMeetingProfile"}],
       order: ['createdAt desc']
     });
-    const meeting = meetingList.map((v) => {
-      return {
+    const meeting = meetingList.map((v) => ({
         ...v,
         notificationSenderUserId: v.notificationSendUserId,
         notificationReceiveUserId: v.notificationReceiveUserId,
@@ -41,22 +41,33 @@ export class NotificationController {
         notificationDesc: v.notificationDesc,
         nickname: v.senderMeetingProfile?.meetingNickname,
         profile: v.senderMeetingProfile?.meetingPhotoMain,
-      };
-    });
+      })
+    );
 
 
     const learningList: NotificationWithRelations[] = await this.notificationRepository.find({
       where: {notificationReceiveUserId: currentUser.userId, notificationDelete: false, notificationServiceType: ServiceType.LEARNING},
+      include: [{relation: "senderLearningProfile"}],
       order: ['createdAt desc']
     });
+    const learning = learningList.map((v) => ({
+      ...v,
+      notificationSenderUserId: v.notificationSendUserId,
+      notificationReceiveUserId: v.notificationReceiveUserId,
+      notificationMsg: v.notificationMsg,
+      notificationType: v.notificationType,
+      notificationShow: v.notificationShow,
+      notificationDesc: v.notificationDesc,
+      nickname: v.senderLearningProfile?.learningNickname,
+      profile: LearningProfileController.getStudentProfile(v.senderLearningProfile),
+    }))
 
     const hobbyList: NotificationWithRelations[] = await this.notificationRepository.find({
       where: {notificationReceiveUserId: currentUser.userId, notificationDelete: false, notificationServiceType: ServiceType.HOBBY},
       include: [{relation: "senderHobbyProfile"}],
       order: ['createdAt desc']
     });
-    const hobby = hobbyList.map((v) => {
-      return {
+    const hobby = hobbyList.map((v) => ({
         ...v,
         notificationSenderUserId: v.notificationSendUserId,
         notificationReceiveUserId: v.notificationReceiveUserId,
@@ -66,9 +77,9 @@ export class NotificationController {
         notificationDesc: v.notificationDesc,
         nickname: v.senderHobbyProfile?.hobbyNickname,
         profile: v.senderHobbyProfile?.hobbyPhoto,
-      };
-    });
-    return { meeting, learning: learningList, hobby};
+      })
+    );
+    return { meeting, learning, hobby};
   }
 
   @get('/notifications/{id}/show')

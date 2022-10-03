@@ -104,5 +104,4 @@ export class Utils {
     return decrypted.toString('utf8');
   }
 
-
 }

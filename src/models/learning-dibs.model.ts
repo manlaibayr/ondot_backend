@@ -1,5 +1,5 @@
-import {belongsTo, Entity, model, property} from '@loopback/repository';
-import {LearningProfile, LearningProfileWithRelations} from './learning-profile.model';
+import {belongsTo, Entity, hasOne, model, property} from '@loopback/repository';
+import {LearningProfile} from './learning-profile.model';
 
 @model({settings: {mysql: {table: 'learning_dibs'}}})
 export class LearningDibs extends Entity {
@@ -16,7 +16,10 @@ export class LearningDibs extends Entity {
   })
   dibsUserId: string;
 
-  @belongsTo(() => LearningProfile, {keyTo: 'userId', name: 'dibsTargetProfile'})
+  @property({
+    type: 'string',
+    required: true,
+  })
   dibsTargetUserId: string;
 
   @property({
@@ -25,6 +28,11 @@ export class LearningDibs extends Entity {
   })
   createdAt?: Date;
 
+  @hasOne(() => LearningProfile, {keyTo: 'userId', keyFrom: 'dibsUserId'})
+  dibsUserProfile?: LearningProfile;
+
+  @hasOne(() => LearningProfile, {keyTo: 'userId', keyFrom: 'dibsTargetUserId'})
+  dibsTargetUserProfile?: LearningProfile;
 
   constructor(data?: Partial<LearningDibs>) {
     super(data);
@@ -33,7 +41,8 @@ export class LearningDibs extends Entity {
 
 export interface LearningDibsRelations {
   // describe navigational properties here
-  dibsTargetProfile: LearningProfileWithRelations;
+  dibsUserProfile?: LearningProfile;
+  dibsTargetUserProfile?: LearningProfile;
 }
 
 export type LearningDibsWithRelations = LearningDibs & LearningDibsRelations;

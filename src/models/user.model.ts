@@ -121,6 +121,18 @@ export class User extends Entity {
   learningProfileId?: string;
 
   @property({
+    type: 'number',
+    default: 0
+  })
+  meetingRanking?: number;
+
+  @property({
+    type: 'number',
+    default: 0
+  })
+  learningRanking?: number;
+
+  @property({
     type: 'string',
     required: true,
     jsonSchema: {

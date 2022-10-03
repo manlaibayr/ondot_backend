@@ -36,3 +36,7 @@ export * from './usage-pass.model';
 export * from './learning-profile.model';
 export * from './learning-dibs.model';
 export * from './learning-review.model';
+export * from './learning-question.model';
+export * from './learning-question-comment.model';
+export * from './learning-question-comment-thumb.model';
+export * from './store-product.model';

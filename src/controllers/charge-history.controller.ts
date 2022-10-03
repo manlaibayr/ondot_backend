@@ -54,9 +54,14 @@ export class ChargeHistoryController {
             chargeUserId: currentUser.userId,
             impUid: data.imp_uid,
             merchantUid: data.merchant_uid,
+            chargeMethod: paymentData.pay_method,
             chargeAmount: data.amount,
             chargeFlower: data.flower,
             chargeDesc: paymentData.name,
+            chargePhone: paymentData.buyer_tel,
+            chargeCardName: paymentData.card_name,
+            chargeCardNumber: paymentData.card_number,
+            chargeApplyNum: paymentData.apply_num,
             chargeStatus: ChargeStatus.SUCCESS
           });
           await this.flowerHistoryRepository.create({

@@ -264,7 +264,7 @@ export class UserController {
       },
       availableLearning: true,
       availableGift: false,
-      availableCharge: false,
+      availableCharge: true,
     };
   }
 

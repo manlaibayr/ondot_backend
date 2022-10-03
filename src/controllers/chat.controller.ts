@@ -22,6 +22,7 @@ import {ChatContact} from '../models';
 import moment from 'moment';
 import {Utils} from '../utils';
 import {FILE_UPLOAD_SERVICE} from '../keys';
+import {LearningProfileController} from './learning-profile.controller';
 
 export class ChatController {
   constructor(
@@ -170,7 +171,7 @@ export class ChatController {
       learningContacts.push({
         ...v,
         nickname: findObj?.learningNickname,
-        profile: findObj?.tchProfileMainPhoto,
+        profile: LearningProfileController.getStudentProfile(findObj),
         lastMsg: lastChat?.msgType === ChatMsgType.TEXT ? lastChat?.msgContent : lastChat?.msgType,
         unreadCount: unReadCount.count,
         isOnline: onlineUserIds.indexOf(v.otherUserId) !== -1,

@@ -56,6 +56,7 @@ export enum FlowerHistoryType {
 }
 
 export enum ServiceType {
+  COMMON = 'COMMON',
   MEETING = 'MEETING',
   LEARNING = 'LEARNING',
   HOBBY = 'HOBBY'
@@ -176,4 +177,9 @@ export enum ChargeStatus {
 export enum LearningProfileType {
   STUDENT = 'STUDENT',
   TEACHER = 'TEACHER',
+}
+
+export enum StoreProductType {
+  FLOWER_POINT = 'FLOWER_POINT',
+  PASS_USABLE = 'PASS_USABLE'
 }

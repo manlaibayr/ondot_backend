@@ -29,6 +29,12 @@ export class ChargeHistory extends Entity {
   merchantUid: string;
 
   @property({
+    type: 'string',
+    required: true,
+  })
+  chargeMethod: string;
+
+  @property({
     type: 'number',
     required: true,
   })
@@ -43,6 +49,26 @@ export class ChargeHistory extends Entity {
     type: 'string',
   })
   chargeDesc?: string;
+
+  @property({
+    type: 'string',
+  })
+  chargePhone?: string;
+
+  @property({
+    type: 'string',
+  })
+  chargeCardName?: string;
+
+  @property({
+    type: 'string',
+  })
+  chargeCardNumber?: string;
+
+  @property({
+    type: 'string',
+  })
+  chargeApplyNum?: string;
 
   @property({
     type: 'string',

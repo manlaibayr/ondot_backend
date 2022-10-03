@@ -57,6 +57,11 @@ export class LearningProfile extends Entity {
   @property({
     type: 'string',
   })
+  learningBackground?: string;
+
+  @property({
+    type: 'string',
+  })
   stuPreferSex?: string;
 
   @property({

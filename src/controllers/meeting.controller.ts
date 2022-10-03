@@ -24,7 +24,7 @@ export class MeetingController {
   ) {
   }
 
-  getMatchCount(
+  getMeetingMatchCount(
     myProfile: any,
     otherProfile: any,
   ): number {
@@ -105,7 +105,7 @@ export class MeetingController {
 
     // 매칭순
     profileList.sort((a: any, b: any) => {
-      return (this.getMatchCount(myProfile, b) - this.getMatchCount(myProfile, a));
+      return (this.getMeetingMatchCount(myProfile, b) - this.getMeetingMatchCount(myProfile, a));
     });
     const matchList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
 

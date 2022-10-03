@@ -19,6 +19,7 @@ import {
   VerifytokenRepository,
 } from '../repositories';
 import {ChatMsgStatus, ChatMsgType, ChatSocketMsgType, ChatType, ContactStatus, MainSocketMsgType, RoomMemberJoinType, ServiceType, UserType} from '../types';
+import {LearningProfileController} from './learning-profile.controller';
 
 const socketUserInfo: {[key: string]: any;} = {};
 
@@ -93,8 +94,8 @@ export class ChatControllerWs {
       if (!meProfile || !otherProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
       const otherBlock = await this.blockUserRepository.findOne({where: {blockUserId: userId, blockOtherUserId: otherUserId, blockServiceType: ServiceType.LEARNING}});
       const meBlock = await this.blockUserRepository.findOne({where: {blockUserId: otherUserId, blockOtherUserId: userId, blockServiceType: ServiceType.LEARNING}});
-      const meInfo = {id: meProfile.userId, profile: meProfile.tchProfileMainPhoto, nickname: meProfile.learningNickname};
-      const otherInfo = {id: otherProfile?.userId, profile: otherProfile?.tchProfileMainPhoto, nickname: otherProfile?.learningNickname, isBlock: !!otherBlock};
+      const meInfo = {id: meProfile.userId, profile: LearningProfileController.getStudentProfile(meProfile), nickname: meProfile.learningNickname};
+      const otherInfo = {id: otherProfile?.userId, profile: LearningProfileController.getStudentProfile(otherProfile), nickname: otherProfile?.learningNickname, isBlock: !!otherBlock};
       return {
         meProfile: meInfo,
         otherProfile: otherInfo,
