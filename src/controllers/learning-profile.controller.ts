@@ -150,9 +150,9 @@ export class LearningProfileController {
           v.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
         });
         if(type !== 'all')  {
-          return listForSubject.slice(0, 15);
+          return listForSubject.slice(0, 30);
         } else {
-          allData.nearList = listForSubject.slice(0, 15);
+          allData.nearList = listForSubject.slice(0, 30);
         }
       }
       if (type === 'all' || type === 'matching') {
@@ -160,18 +160,16 @@ export class LearningProfileController {
           return (this.getStudentMatchCount(learningProfile, b) - this.getStudentMatchCount(learningProfile, a));
         });
         if(type !== 'all')  {
-          return profileList.slice(0, 15);
+          return profileList.slice(0, 30);
         } else {
-          allData.matchList = profileList.slice(0, 15);
+          allData.matchList = profileList.slice(0, 30);
         }
       }
 
       if (type === 'all') {
         return {
           learningProfile,
-          popularList: profileList.slice(0, 7),
-          nearList: profileList.slice(21, 35),
-          matchList: profileList.slice(9, 17),
+          ...allData,
         };
       }
     } else if (learningProfile?.learningProfileType === LearningProfileType.TEACHER) {   // 선생일때
@@ -218,8 +216,7 @@ export class LearningProfileController {
       }
       return {
         learningProfile,
-        nearList: profileList.slice(21, 35),
-        matchList: profileList.slice(9, 17),
+        ...allData,
       };
     }
   }

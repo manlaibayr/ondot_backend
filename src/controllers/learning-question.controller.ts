@@ -1,19 +1,23 @@
 import {repository} from '@loopback/repository';
 import {post, get, getModelSchemaRef, requestBody, response, param} from '@loopback/rest';
 import {LearningQuestion, LearningQuestionWithRelations} from '../models';
-import {LearningQuestionCommentRepository, LearningQuestionCommentThumbRepository, LearningQuestionRepository} from '../repositories';
+import {FlowerHistoryRepository, LearningQuestionCommentRepository, LearningQuestionCommentThumbRepository, LearningQuestionRepository, PointSettingRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
-import {UserCredentials} from '../types';
+import {FlowerHistoryType, PointSettingType, UserCredentials} from '../types';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {LearningProfileController} from './learning-profile.controller';
+import {Utils} from '../utils';
 
 export class LearningQuestionController {
   constructor(
     @repository(LearningQuestionRepository) public learningQuestionRepository: LearningQuestionRepository,
     @repository(LearningQuestionCommentRepository) public learningQuestionCommentRepository: LearningQuestionCommentRepository,
     @repository(LearningQuestionCommentThumbRepository) public learningQuestionCommentThumbRepository: LearningQuestionCommentThumbRepository,
+    @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
+    @repository(UserRepository) public userRepository: UserRepository,
+    @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
@@ -79,12 +83,25 @@ export class LearningQuestionController {
     @requestBody() data: {questionId: string, parentCommentId?: string, content: string},
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    await this.learningQuestionCommentRepository.create({
+    const questionInfo = await this.learningQuestionRepository.findById(data.questionId);
+    const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_LEARNING_COMMENT);
+    const commentFlower = pointSetting.pointSettingAmount;
+
+    const commentInfo = await this.learningQuestionCommentRepository.create({
       commentUserId: currentUser.userId,
       commentQuestionId: data.questionId,
       commentParentId: data.parentCommentId,
       commentContent: data.content,
       commentThumbCount: 0,
+    });
+    await this.userRepository.updateById(currentUser.userId, {freeFlower: currentUser.freeFlower + commentFlower});
+    await this.flowerHistoryRepository.create({
+      flowerUserId: currentUser.userId,
+      flowerContent: questionInfo.questionTitle + '질문에 답변작성',
+      flowerValue: commentFlower,
+      isFreeFlower: true,
+      flowerHistoryType: FlowerHistoryType.QUESTION_COMMENT,
+      flowerHistoryRefer: commentInfo.id,
     });
     const commentCount = await this.learningQuestionCommentRepository.count({commentQuestionId: data.questionId});
     await this.learningQuestionRepository.updateById(data.questionId, {questionCommentCount: commentCount.count});

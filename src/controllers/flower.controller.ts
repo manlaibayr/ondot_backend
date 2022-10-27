@@ -1,6 +1,6 @@
 import {repository} from '@loopback/repository';
 import {get, HttpErrors, param, post, requestBody} from '@loopback/rest';
-import {FlowerHistoryRepository, HobbyRoomRepository, MeetingProfileRepository, UsagePassRepository, UserRepository} from '../repositories';
+import {FlowerHistoryRepository, HobbyRoomRepository, MeetingProfileRepository, StoreProductRepository, UsagePassRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
@@ -16,6 +16,7 @@ export class FlowerController {
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @repository(UsagePassRepository) public usagePassRepository: UsagePassRepository,
     @repository(HobbyRoomRepository) public hobbyRoomRepository: HobbyRoomRepository,
+    @repository(StoreProductRepository) public storeProductRepository: StoreProductRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
@@ -94,48 +95,34 @@ export class FlowerController {
   @secured(SecuredType.IS_AUTHENTICATED)
   async usagePassPurchase(
     @param.query.string('passId') passId: string,
-    @param.query.string('serviceType') serviceType: ServiceType,
   ) {
-    const priceList: any = {
-      [ServiceType.MEETING]: {
-        month1: {flower: 1000, label: '1개월', dateNum: 1, dateUnit: 'months'},
-        month3: {flower: 2000, label: '3개월', dateNum: 3, dateUnit: 'months'},
-        month6: {flower: 3000, label: '6개월', dateNum: 6, dateUnit: 'months'},
-      },
-      [ServiceType.LEARNING]: {
-        week1: {flower: 1500, label: '1주일', dateNum: 1, dateUnit: 'weeks'},
-        month1: {flower: 3000, label: '1개월', dateNum: 1, dateUnit: 'months'},
-        month3: {flower: 6000, label: '3개월', dateNum: 3, dateUnit: 'months'},
-        month6: {flower: 9000, label: '6개월', dateNum: 6, dateUnit: 'months'},
-      },
-    };
-    const passReqInfo = priceList[serviceType]?.[passId];
-    if (!passReqInfo) throw new HttpErrors.BadRequest('정확하지 않은 요청입니다.');
+    const productInfo = await this.storeProductRepository.findById(passId);
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    if((currentUser.payFlower + currentUser.freeFlower) < passReqInfo.flower) throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
+    if((currentUser.payFlower + currentUser.freeFlower) < productInfo.productFlower) throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
     // 이미 존재하는 이용권 확인
     const alreadyPassList = await this.usagePassRepository.find({
-      where: {passUserId: currentUser.userId, passServiceType: serviceType, passExpireDate: {gte: moment().toDate()}},
+      where: {passUserId: currentUser.userId, passServiceType: productInfo.productServiceType, passExpireDate: {gte: moment().toDate()}},
       order: ['passExpireDate desc'],
     });
     const passStartDate = alreadyPassList.length > 0 ? alreadyPassList[0].passExpireDate : moment().toDate();
-    const passExpireDate = moment(passStartDate).add(passReqInfo.dateNum, passReqInfo.dateUnit);
-    const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, passReqInfo.flower);
+    const passExpireDate = moment(passStartDate).add(productInfo.productPeriodOfDay, 'days');
+    const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, productInfo.productFlower);
     await Promise.all([
       this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower}),
       this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
         flowerUserId: currentUser.userId,
-        flowerContent: `${serviceType} ${passReqInfo.label} 이용권 구매`,
+        flowerContent: `${productInfo.productServiceType} ${productInfo.productName} 이용권 구매`,
         flowerValue: v.flowerValue,
         isFreeFlower: v.isFreeFlower,
         flowerHistoryType: FlowerHistoryType.PASS_PURCHASE,
+        flowerHistoryRefer: passId,
       }))),
       this.usagePassRepository.create({
         passUserId: currentUser.userId,
-        passName: passReqInfo.label,
+        passName: productInfo.productName,
         passStartDate,
         passExpireDate,
-        passServiceType: serviceType
+        passServiceType: productInfo.productServiceType
       }),
     ]);
     return {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower};

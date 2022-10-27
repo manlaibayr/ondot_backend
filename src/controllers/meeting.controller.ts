@@ -4,8 +4,8 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
-import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
-import {ChatType, ContactStatus, FlowerHistoryType, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
+import {BlockPhoneRepository, ChatContactRepository, FlowerHistoryRepository, MeetingProfileRepository, NotificationRepository, PointSettingRepository, UserRepository} from '../repositories';
+import {ChatType, ContactStatus, FlowerHistoryType, MainSocketMsgType, NotificationType, PointSettingType, ServiceType, UserCredentials} from '../types';
 import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {FlowerController} from './flower.controller';
@@ -19,6 +19,7 @@ export class MeetingController {
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
     @repository(BlockPhoneRepository) public blockPhoneRepository: BlockPhoneRepository,
+    @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(`controllers.FlowerController`) private flowerController: FlowerController
   ) {
@@ -126,7 +127,8 @@ export class MeetingController {
     @param.query.string('userId') userId: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const requestFlower = 3;
+    const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_MEETING_CHAT);
+    const requestFlower = pointSetting.pointSettingAmount;
 
     const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
     if (!hasMeetingPass && (currentUser.payFlower + currentUser.freeFlower) < requestFlower) {

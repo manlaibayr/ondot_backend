@@ -13,8 +13,17 @@ import AppleAuth from 'apple-auth';
 import {CONFIG} from '../config';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, SignupType, UserCredentials, UserStatusType, UserType} from '../types';
-import {HobbyProfileRepository, LearningProfileRepository, MeetingProfileRepository, RolemappingRepository, UserRepository, VerifyCodeRepository, VerifytokenRepository} from '../repositories';
+import {FileUploadHandler, PointSettingType, SignupType, UserCredentials, UserStatusType, UserType} from '../types';
+import {
+  HobbyProfileRepository,
+  LearningProfileRepository,
+  MeetingProfileRepository,
+  PointSettingRepository,
+  RolemappingRepository,
+  UserRepository,
+  VerifyCodeRepository,
+  VerifytokenRepository,
+} from '../repositories';
 import {User, UserRelations, UserWithRelations} from '../models';
 import {VerifyCodeController} from './verify-code.controller';
 
@@ -33,6 +42,7 @@ export class UserController {
     @repository(MeetingProfileRepository) private profileMeetingRepository: MeetingProfileRepository,
     @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
     @repository(LearningProfileRepository) private learningProfileRepository: LearningProfileRepository,
+    @repository(PointSettingRepository) private pointSettingRepository: PointSettingRepository,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
@@ -145,6 +155,7 @@ export class UserController {
         return {result: 'existEmail', data: {userId: checkRealUserInfo.id, email: checkRealUserInfo.email, signupType: checkRealUserInfo.signupType}};
       }
     }
+    const signupPoint = await this.pointSettingRepository.findById(PointSettingType.POINT_SIGNUP);
     signUpInfo.phoneNumber = niceInfo.phoneNumber;
     const userInfo = await this.userRepository.create({
       username: niceInfo.name,
@@ -160,6 +171,7 @@ export class UserController {
       refereeEmail: signUpInfo.refereeEmail,
       userType: UserType.USER,
       userStatus: UserStatusType.NORMAL,
+      freeFlower: signupPoint.pointSettingAmount,
     });
     await this.rolemappingRepository.create({user_id: userInfo.id, role_id: UserType.USER});
     return {
@@ -249,6 +261,8 @@ export class UserController {
     const profileMeeting = await this.profileMeetingRepository.findOne({where: {userId: currentUser.userId}});
     const profileHobby = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
     const profileLearning = await this.learningProfileRepository.findOne({where: {userId: currentUser.userId}});
+    const pointSettingList = await this.pointSettingRepository.find({fields: ['id', 'pointSettingAmount']});
+    const pointSettingInfo = pointSettingList.reduce((acc, v) => ({...acc, [v.id]: v.pointSettingAmount}), {});
     return {
       id: userInfo.id,
       username: userInfo.username,
@@ -262,8 +276,9 @@ export class UserController {
         hobby: profileHobby,
         learning: profileLearning,
       },
+      pointSettingInfo,
       availableLearning: true,
-      availableGift: false,
+      availableGift: true,
       availableCharge: true,
     };
   }

@@ -40,3 +40,4 @@ export * from './learning-question.model';
 export * from './learning-question-comment.model';
 export * from './learning-question-comment-thumb.model';
 export * from './store-product.model';
+export * from './point-setting.model';

@@ -1,12 +1,12 @@
 import {Filter, repository} from '@loopback/repository';
 import {param, get, post, requestBody} from '@loopback/rest';
 import {LearningReview} from '../models';
-import {FlowerHistoryRepository, LearningProfileRepository, LearningReviewRepository, UserRepository} from '../repositories';
+import {FlowerHistoryRepository, LearningProfileRepository, LearningReviewRepository, PointSettingRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
-import {FlowerHistoryType, UserCredentials} from '../types';
+import {FlowerHistoryType, PointSettingType, UserCredentials} from '../types';
 
 export class LearningReviewController {
   constructor(
@@ -14,6 +14,7 @@ export class LearningReviewController {
     @repository(LearningReviewRepository) public learningReviewRepository : LearningReviewRepository,
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(LearningProfileRepository) public learningProfileRepository: LearningProfileRepository,
+    @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {}
 
@@ -46,7 +47,8 @@ export class LearningReviewController {
       reviewContent: data.content,
       reviewHideName: data.hideName,
     });
-    const addFlower = 10;
+    const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_LEARNING_REVIEW);
+    const addFlower = pointSetting.pointSettingAmount;
     await this.userRepository.updateById(currentUser.userId, {freeFlower: currentUser.freeFlower + addFlower});
     await this.flowerHistoryRepository.create({
       flowerUserId: currentUser.userId, flowerContent: teacherProfile?.learningNickname + ' 선생님 후기작성 보상', flowerValue: addFlower, isFreeFlower: true,

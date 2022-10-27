@@ -21,12 +21,11 @@ export class StoreProduct extends Entity {
 
   @property({
     type: 'string',
-    required: true,
     jsonSchema: {
       enum: Object.values(ServiceType),
     },
   })
-  productServiceType: ServiceType;
+  productServiceType?: ServiceType;
 
   @property({
     type: 'string',

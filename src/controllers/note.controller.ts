@@ -1,8 +1,8 @@
 import {repository} from '@loopback/repository';
 import {get, HttpErrors, param, post, requestBody} from '@loopback/rest';
-import {FlowerHistoryRepository, LearningProfileRepository, MeetingProfileRepository, NoteRepository, NotificationRepository, UserRepository} from '../repositories';
+import {FlowerHistoryRepository, LearningProfileRepository, MeetingProfileRepository, NoteRepository, NotificationRepository, PointSettingRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
-import {FlowerHistoryType, MainSocketMsgType, NotificationType, ServiceType, UserCredentials} from '../types';
+import {FlowerHistoryType, MainSocketMsgType, NotificationType, PointSettingType, ServiceType, UserCredentials} from '../types';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
@@ -19,6 +19,7 @@ export class NoteController {
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(LearningProfileRepository) public learningProfileRepository: LearningProfileRepository,
+    @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(`controllers.FlowerController`) private flowerController: FlowerController,
   ) {
@@ -44,7 +45,8 @@ export class NoteController {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     let nickname: string | undefined , noteId: string | undefined, profile: string | undefined, age: number | undefined;
     if (data.serviceType === ServiceType.MEETING) {
-      const noteFlower = 2;
+      const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_MEETING_NOTE);
+      const noteFlower = pointSetting.pointSettingAmount;
       const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
       if (!hasMeetingPass && (currentUser.payFlower + currentUser.freeFlower) < noteFlower) {
         throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');

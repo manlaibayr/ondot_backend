@@ -5,13 +5,16 @@ import {UserProfile} from '@loopback/security';
 import {Filter, repository} from '@loopback/repository';
 import moment from 'moment';
 import {secured, SecuredType} from '../role-authentication';
-import {RankingType, ServiceType, UserCredentials} from '../types';
-import {LearningProfile, LearningQuestionComment, LearningReview, RankingUser} from '../models';
+import {LearningProfileType, RankingType, ServiceType, UserCredentials} from '../types';
+import {LearningQuestionComment, LearningReview, RankingUser} from '../models';
 import {
   AttendanceRepository,
   ChatContactRepository,
   HobbyRoomRepository,
-  LearningProfileRepository, LearningQuestionCommentRepository, LearningQuestionRepository, LearningReviewRepository,
+  LearningProfileRepository,
+  LearningQuestionCommentRepository,
+  LearningQuestionRepository,
+  LearningReviewRepository,
   LikeRepository,
   RankingUserRepository,
   RatingRepository,
@@ -111,7 +114,11 @@ export class RankingUserController {
     data.thumb = Math.min(commentThumbCount * 10, 100);
     const reviewList = await this.learningReviewRepository.find({where: {reviewTeacherUserId: userId, createdAt: {between: [startDate, endDate]}}});
     data.review = reviewList.length === 0 ? 0 : Math.floor((reviewList.reduce((acc: number, v: LearningReview) => (v.reviewValue || 0) * 20, 0)) / reviewList.length);
-    data.sum = data.attendance + data.question + data.questionComment + data.thumb + data.review;
+    if(learningProfile.learningProfileType === LearningProfileType.STUDENT) {
+      data.sum = data.attendance + data.question + data.thumb;
+    } else {
+      data.sum = data.attendance + data.questionComment + data.thumb + data.review;
+    }
     return data;
   }
 
@@ -182,11 +189,27 @@ export class RankingUserController {
     await this.rankingUserRepository.createAll(rankingList);
   }
 
+  public async cronUserTotalLike() {
+    const userList = await this.userRepository.find({});
+    //미팅 호감도
+    for (const u of userList) {
+      // 누적지수 계산
+      try {
+        const meetingFavor = await this.calcUserMeetingMonthFavor(u.id, moment('2022-01-01').toDate(), moment().toDate());
+        const learningFavor = await this.calcUserLearningMonthFavor(u.id, moment('2022-01-01').toDate(), moment().toDate());
+        await this.userRepository.updateById(u.id, {meetingRanking: meetingFavor?.sumFavor || 0, learningRanking: learningFavor?.sum || 0});
+      } catch (e) {}
+    }
+  }
+
   @get('/ranking-users/meeting-favor')
   @secured(SecuredType.IS_AUTHENTICATED)
   async meetingFavorInfo() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const userInfo = await this.userRepository.findById(currentUser.userId);
+    if(userInfo.createdAt > moment().subtract(2, 'weeks').toDate()) {
+      return { needWait: true}
+    }
     const {rankingDate} = this.getRankingDate(RankingType.MONTH);
     const favorInfo = await this.calcUserMeetingMonthFavor(currentUser.userId, moment().startOf('week').toDate(), moment().toDate());
     if (!favorInfo) throw new HttpErrors.BadRequest('미팅 프로필이 존재하지 않습니다.');
@@ -226,11 +249,14 @@ export class RankingUserController {
   async learningFavorInfo() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const userInfo = await this.userRepository.findById(currentUser.userId);
+    if(userInfo.createdAt > moment().subtract(2, 'weeks').toDate()) {
+      return { needWait: true}
+    }
     const {rankingDate} = this.getRankingDate(RankingType.MONTH);
     const favorInfo = await this.calcUserLearningMonthFavor(currentUser.userId, moment().startOf('week').toDate(), moment().toDate());
     if (!favorInfo) throw new HttpErrors.BadRequest('러닝 프로필이 존재하지 않습니다.');
     const sexRatingList = await this.rankingUserRepository.find({
-      where: {rankingServiceType: ServiceType.LEARNING, rankingType: RankingType.MONTH_RATING, rankingDate, rankingSex: userInfo.sex},
+      where: {rankingServiceType: ServiceType.LEARNING, rankingType: RankingType.MONTH_RATING, rankingDate},
       fields: ['rankingValue'],
     });
     const sexSumRating = sexRatingList.reduce((acc, cur) => acc + cur.rankingValue, 0);
@@ -246,7 +272,7 @@ export class RankingUserController {
     const myFavorInfoIndex = allFavorList.findIndex((v) => v.rankingUserId === currentUser.userId);
     const favorPercentage = (allFavorList.length === 0 || myFavorInfoIndex === -1) ? 100 : Number((myFavorInfoIndex / allFavorList.length).toFixed(2)) * 100;
     return {
-      sex: userInfo.sex ? '남성' : '여성',
+      currentAvgRating: favorInfo.review / 20,
       sexAvgRating: sexRatingList.length === 0 ? 0 : Number((sexSumRating / sexRatingList.length).toFixed(2)),
       lastMonthRating: lastMonthRating ? lastMonthRating.rankingValue : 0,
       favorPercentage,
@@ -254,8 +280,9 @@ export class RankingUserController {
         attendance: favorInfo.attendance,
         question: favorInfo.question,
         questionComment: favorInfo.questionComment,
-        thumb: favorInfo.thumb,
+        questionCommentThumb: favorInfo.thumb,
         review: favorInfo.review,
+        total: userInfo.learningRanking,
       },
     };
   }

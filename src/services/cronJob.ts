@@ -23,7 +23,11 @@ class EveryDayCronJob extends CronJob {
         await this.hobbyRoomRepository.updateAll({isRoomDelete: true}, {isRoomDelete: false, roomExpiredDate : {lt: new Date()}});
         // 매일 3달동안 이용안한 플라워제거
 
+        // 매일 회원들의 미팅호감지수, 러닝 좋아요지수 계산
+        await rankingUserController.cronUserTotalLike();
 
+        // 매일 회원들 나이 다시 반영
+        
         //일요일이면 주간 랭킹 처리
         if(moment().day() === 0) {
           await rankingUserController.cronRanking(RankingType.WEEK);
@@ -36,6 +40,7 @@ class EveryDayCronJob extends CronJob {
         if(moment().isSame(moment().startOf('year'), 'day')) {
 
         }
+
       },
       cronTime: '1 0 0 * * *', // 매일 0시 0분 1초에 실행
       start: true,

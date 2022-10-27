@@ -6,7 +6,7 @@ import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import axios from 'axios';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, FlowerHistoryType, ServiceType, UserCredentials} from '../types';
+import {FileUploadHandler, FlowerHistoryType, PointSettingType, ServiceType, UserCredentials} from '../types';
 import {MeetingProfile} from '../models';
 import {
   BlockPhoneRepository,
@@ -14,7 +14,7 @@ import {
   ChatContactRepository,
   FlowerHistoryRepository,
   LikeRepository,
-  MeetingProfileRepository,
+  MeetingProfileRepository, PointSettingRepository,
   RatingRepository,
   UsagePassRepository,
   UserRepository,
@@ -38,6 +38,7 @@ export class MeetingProfileController {
     @repository(BlockPhoneRepository) public blockPhoneRepository: BlockPhoneRepository,
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(UsagePassRepository) public usagePassRepository: UsagePassRepository,
+    @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
     @inject(`controllers.FlowerController`) private flowerController: FlowerController,
@@ -125,14 +126,17 @@ export class MeetingProfileController {
     meetingProfile.sex = userInfo.sex ? '남성' : '여성';
     let freeFlower = currentUser.freeFlower;
     if (meetingProfile.meetingPhotoAdditional && meetingProfile.meetingPhotoAdditional.split(',').length >= 4) {
+      const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_MEETING_PROFILE);
+      const additionalFlower = pointSetting.pointSettingAmount;
+
       await this.flowerHistoryRepository.create({
         flowerUserId: currentUser.userId,
         flowerContent: '미팅프로필 등록시 사진 4장을 추가하여 받음',
-        flowerValue: 20,
+        flowerValue: additionalFlower,
         isFreeFlower: true,
         flowerHistoryType: FlowerHistoryType.NORMAL
       });
-      freeFlower += 20;
+      freeFlower += additionalFlower;
     }
     if(meetingProfile.meetingResidence) {
       const {lat, lng} = await this.getCoordinates(meetingProfile.meetingResidence);

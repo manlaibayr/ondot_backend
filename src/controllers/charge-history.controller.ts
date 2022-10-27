@@ -5,7 +5,7 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import axios from 'axios';
 import {ChargeHistory} from '../models';
-import {ChargeHistoryRepository, FlowerHistoryRepository, NotificationRepository, UserRepository} from '../repositories';
+import {ChargeHistoryRepository, FlowerHistoryRepository, NotificationRepository, StoreProductRepository, UserRepository} from '../repositories';
 import {ChargeStatus, FlowerHistoryType, UserCredentials} from '../types';
 import {secured, SecuredType} from '../role-authentication';
 import {CONFIG} from '../config';
@@ -16,6 +16,7 @@ export class ChargeHistoryController {
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(UserRepository) public userRepository: UserRepository,
+    @repository(StoreProductRepository) public storeProductRepository: StoreProductRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
@@ -23,9 +24,10 @@ export class ChargeHistoryController {
   @post('/charge-histories')
   @secured(SecuredType.IS_AUTHENTICATED)
   async create(
-    @requestBody() data: {imp_uid: string, merchant_uid: string, amount: number, flower: number, desc: string},
+    @requestBody() data: {priceId: string, imp_uid: string, merchant_uid: string, amount: number, flower: number, desc: string},
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const priceInfo = await this.storeProductRepository.findById(data.priceId);
     // 액세스 토큰(access token) 발급 받기
     const getToken = await axios({
       url: 'https://api.iamport.kr/users/getToken',

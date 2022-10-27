@@ -1,10 +1,10 @@
 import {repository} from '@loopback/repository';
 import {get, HttpErrors, param} from '@loopback/rest';
-import {FlowerHistoryRepository, LikeRepository, MeetingProfileRepository, UserRepository} from '../repositories';
+import {FlowerHistoryRepository, LikeRepository, MeetingProfileRepository, PointSettingRepository, UserRepository} from '../repositories';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
-import {FlowerHistoryType, ServiceType, UserCredentials} from '../types';
+import {FlowerHistoryType, PointSettingType, ServiceType, UserCredentials} from '../types';
 import {secured, SecuredType} from '../role-authentication';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace} from 'socket.io';
@@ -17,6 +17,7 @@ export class LikeController {
     @repository(UserRepository) public userRepository: UserRepository,
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
+    @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(`controllers.FlowerController`) private flowerController: FlowerController
   ) {
@@ -28,7 +29,8 @@ export class LikeController {
     @param.query.string('otherId') otherUserId: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const likeFlower = 1;
+    const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_MEETING_LIKE);
+    const likeFlower = pointSetting.pointSettingAmount;
 
     const hasMeetingPass = await this.flowerController.hasUsagePass(currentUser.userId, ServiceType.MEETING);
     if (!hasMeetingPass && (currentUser.payFlower + currentUser.freeFlower) < likeFlower) {

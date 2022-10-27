@@ -40,3 +40,4 @@ export * from './learning-question-comment-thumb.repository';
 export * from './learning-question-comment.repository';
 export * from './learning-question.repository';
 export * from './store-product.repository';
+export * from './point-setting.repository';
