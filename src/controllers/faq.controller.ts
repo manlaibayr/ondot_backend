@@ -24,6 +24,7 @@ import {secured, SecuredType} from '../role-authentication';
 export class FaqController {
   constructor(
     @repository(FaqRepository)
+
     public faqRepository : FaqRepository,
   ) {}
 
