@@ -181,6 +181,12 @@ export class MeetingProfile extends Entity {
   meetingBackground?: string;
 
   @property({
+    type: 'number',
+    default: 0
+  })
+  meetingRanking?: number;
+
+  @property({
     type: 'date',
     default: "$now"
   })

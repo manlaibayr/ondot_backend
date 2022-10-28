@@ -195,6 +195,12 @@ export class LearningProfile extends Entity {
   tchVerifyPhoto?: string;
 
   @property({
+    type: 'number',
+    default: 0
+  })
+  learningRanking?: number;
+
+  @property({
     type: 'date'
   })
   updatedAt?: Date;

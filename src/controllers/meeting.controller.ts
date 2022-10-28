@@ -83,32 +83,30 @@ export class MeetingController {
     const blockUsers = await this.userRepository.find({where: {phoneNumber: {inq: blockPhones.map((v) => v.blockPhoneNum)}}});
     const blokcIds = blockUsers.map((v) => v.id);
     blokcIds.push(currentUser.userId);
-    const profileList = await this.meetingProfileRepository.find({where: {userId: {nin: blokcIds}}});
+    let profileList: any[] = await this.meetingProfileRepository.find({where: {userId: {nin: blokcIds}}, order: ['meetingRanking desc']});
 
     // 접속한 회원 리스트
     const rooms: any = nspMain.adapter.rooms;
     const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
-    profileList.forEach((v: any) => {
-      v.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
-      // const info: any = v.toJSON();
-      // info.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
-      // profileList.push(info);
-    });
+    profileList = profileList.map((v: any) => ({
+      ...v,
+      isOnline: onlineUserIds.indexOf(v.userId) !== -1
+    }));
 
     //인기순
-    const popularList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
+    const popularList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v)));
 
     // 거리순
     profileList.sort((a: any, b: any) => {
       return (this.getDistance(myProfile, a) - this.getDistance(myProfile, b));
     });
-    const nearList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
+    const nearList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v)));
 
     // 매칭순
     profileList.sort((a: any, b: any) => {
       return (this.getMeetingMatchCount(myProfile, b) - this.getMeetingMatchCount(myProfile, a));
     });
-    const matchList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v.toJSON())));
+    const matchList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v)));
 
 
     const data = {

@@ -119,7 +119,7 @@ export class LearningProfileController {
     const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
     const allData: any = {};
     if (learningProfile?.learningProfileType === LearningProfileType.STUDENT) {   // 학생일때
-      const profileList = await this.learningProfileRepository.find({where: {learningProfileType: LearningProfileType.TEACHER}});// 접속한 회원 리스트
+      const profileList = await this.learningProfileRepository.find({where: {learningProfileType: LearningProfileType.TEACHER}, order: ['learningRanking desc']});// 접속한 회원 리스트
       profileList.forEach((v: any) => {
         v.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
       });
@@ -173,7 +173,7 @@ export class LearningProfileController {
         };
       }
     } else if (learningProfile?.learningProfileType === LearningProfileType.TEACHER) {   // 선생일때
-      const profileList = await this.learningProfileRepository.find({where: {learningProfileType: LearningProfileType.STUDENT}});
+      const profileList = await this.learningProfileRepository.find({where: {learningProfileType: LearningProfileType.STUDENT}, order: ['learningRanking desc']});
       profileList.forEach((v: any) => {
         v.isOnline = onlineUserIds.indexOf(v.userId) !== -1;
         v.tchProfileMainPhoto = LearningProfileController.getStudentProfile(v);

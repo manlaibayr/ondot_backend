@@ -15,7 +15,7 @@ import {
   LearningQuestionCommentRepository,
   LearningQuestionRepository,
   LearningReviewRepository,
-  LikeRepository,
+  LikeRepository, MeetingProfileRepository,
   RankingUserRepository,
   RatingRepository,
   UserRepository,
@@ -36,6 +36,7 @@ export class RankingUserController {
     @repository(LearningQuestionRepository) public learningQuestionRepository: LearningQuestionRepository,
     @repository(LearningQuestionCommentRepository) public learningQuestionCommentRepository: LearningQuestionCommentRepository,
     @repository(LearningReviewRepository) public learningReviewRepository: LearningReviewRepository,
+    @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
@@ -65,7 +66,7 @@ export class RankingUserController {
   private async calcUserMeetingMonthFavor(userId: string, startDate: Date, endDate: Date) {
     const userInfo = await this.userRepository.findById(userId);
     if (!userInfo.meetingProfileId) return null;
-    const visitCount = await this.visitRepository.count({visitOtherUserId: userId, createdAt: {between: [startDate, endDate]}});
+    const visitCount = await this.visitRepository.count({visitOtherUserId: userId, visitLastTime: {between: [startDate, endDate]}});
     const likeCount = await this.likeRepository.count({likeOtherUserId: userId, createdAt: {between: [startDate, endDate]}});
     const contactCount = await this.chatContactRepository.count({contactOtherUserId: userId, contactServiceType: ServiceType.MEETING, createdAt: {between: [startDate, endDate]}});
     const averageRating = await this.calcUserAvgRating(userId, startDate, endDate);
@@ -102,8 +103,10 @@ export class RankingUserController {
       thumb: 0,
       review: 0,
       sum: 0,
+      learningRanking: 0
     };
     const learningProfile = await this.learningProfileRepository.findById(userInfo.learningProfileId);
+    data.learningRanking = learningProfile.learningRanking ?? 0;
     const attendanceCount = await this.attendanceRepository.count({attendanceUserId: userId, createdAt: {between: [startDate, endDate]}});
     data.attendance = Math.min(attendanceCount.count * 5, 100);
     const questionCount = await this.learningQuestionRepository.count({questionUserId: userId, createdAt: {between: [startDate, endDate]}});
@@ -197,7 +200,8 @@ export class RankingUserController {
       try {
         const meetingFavor = await this.calcUserMeetingMonthFavor(u.id, moment('2022-01-01').toDate(), moment().toDate());
         const learningFavor = await this.calcUserLearningMonthFavor(u.id, moment('2022-01-01').toDate(), moment().toDate());
-        await this.userRepository.updateById(u.id, {meetingRanking: meetingFavor?.sumFavor || 0, learningRanking: learningFavor?.sum || 0});
+        await this.meetingProfileRepository.updateAll({meetingRanking: meetingFavor?.sumFavor || 0}, {userId: u.id});
+        await this.learningProfileRepository.updateAll({learningRanking: learningFavor?.sum || 0}, {userId: u.id});
       } catch (e) {}
     }
   }
@@ -211,7 +215,7 @@ export class RankingUserController {
       return { needWait: true}
     }
     const {rankingDate} = this.getRankingDate(RankingType.MONTH);
-    const favorInfo = await this.calcUserMeetingMonthFavor(currentUser.userId, moment().startOf('week').toDate(), moment().toDate());
+    const favorInfo = await this.calcUserMeetingMonthFavor(currentUser.userId, moment().startOf('month').toDate(), moment().toDate());
     if (!favorInfo) throw new HttpErrors.BadRequest('미팅 프로필이 존재하지 않습니다.');
     const sexRatingList = await this.rankingUserRepository.find({
       where: {rankingServiceType: ServiceType.MEETING, rankingType: RankingType.MONTH_RATING, rankingDate, rankingSex: userInfo.sex},
@@ -253,7 +257,7 @@ export class RankingUserController {
       return { needWait: true}
     }
     const {rankingDate} = this.getRankingDate(RankingType.MONTH);
-    const favorInfo = await this.calcUserLearningMonthFavor(currentUser.userId, moment().startOf('week').toDate(), moment().toDate());
+    const favorInfo = await this.calcUserLearningMonthFavor(currentUser.userId, moment().startOf('month').toDate(), moment().toDate());
     if (!favorInfo) throw new HttpErrors.BadRequest('러닝 프로필이 존재하지 않습니다.');
     const sexRatingList = await this.rankingUserRepository.find({
       where: {rankingServiceType: ServiceType.LEARNING, rankingType: RankingType.MONTH_RATING, rankingDate},
@@ -282,7 +286,7 @@ export class RankingUserController {
         questionComment: favorInfo.questionComment,
         questionCommentThumb: favorInfo.thumb,
         review: favorInfo.review,
-        total: userInfo.learningRanking,
+        total: favorInfo.learningRanking,
       },
     };
   }
