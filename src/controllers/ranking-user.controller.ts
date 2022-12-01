@@ -66,6 +66,7 @@ export class RankingUserController {
   private async calcUserMeetingMonthFavor(userId: string, startDate: Date, endDate: Date) {
     const userInfo = await this.userRepository.findById(userId);
     if (!userInfo.meetingProfileId) return null;
+    const meetingProfile = await this.meetingProfileRepository.findOne({where: {userId}});
     const visitCount = await this.visitRepository.count({visitOtherUserId: userId, visitLastTime: {between: [startDate, endDate]}});
     const likeCount = await this.likeRepository.count({likeOtherUserId: userId, createdAt: {between: [startDate, endDate]}});
     const contactCount = await this.chatContactRepository.count({contactOtherUserId: userId, contactServiceType: ServiceType.MEETING, createdAt: {between: [startDate, endDate]}});
@@ -76,9 +77,11 @@ export class RankingUserController {
       contact: Math.min(100, contactCount.count),
       averageRating: Math.min(100, averageRating * 20),
     };
+    const sum = data.visit + data.like + data.contact + data.averageRating;
+
     return {
       ...data,
-      sumFavor: data.visit + data.like + data.contact + data.averageRating,
+      sumFavor: sum + Math.round(sum * ((meetingProfile?.meetingAdminAdd || 0) / 100)),
     };
   }
 
@@ -89,7 +92,7 @@ export class RankingUserController {
   }
 
   private async calcHobbyRoomRanking() {
-    const hobbyRoomList = await this.hobbyRoomRepository.find({where: {isRoomDelete: false}, order: ['roomMemberNumber desc'], limit: 10});
+    const hobbyRoomList = await this.hobbyRoomRepository.find({where: {isRoomDelete: false}, order: ['roomMemberNumber desc']});
     return hobbyRoomList.map((v) => ({roomId: v.id, ranking: v.roomMemberNumber}));
   }
 
@@ -122,6 +125,7 @@ export class RankingUserController {
     } else {
       data.sum = data.attendance + data.questionComment + data.thumb + data.review;
     }
+    data.sum = data.sum + Math.round(data.sum * ((learningProfile?.learningAdminAdd || 0) / 100));
     return data;
   }
 
@@ -133,24 +137,29 @@ export class RankingUserController {
   public async cronRanking(rankingType: RankingType) {
     const {startDate, endDate, rankingDate} = this.getRankingDate(rankingType);
     const userList = await this.userRepository.find({});
-    //미팅 호감도
+    //미팅, 러닝 호감도
     const meetingFavorList = [];
     const meetingRatingList = [];
+    const learningRatingList = [];
     for (const u of userList) {
-      const favor = await this.calcUserMeetingMonthFavor(u.id, startDate, endDate);
-      if (favor !== null) {
+      const meetingFavor = await this.calcUserMeetingMonthFavor(u.id, startDate, endDate);
+      const learningFavor = await this.calcUserLearningMonthFavor(u.id, startDate, endDate);
+      if (meetingFavor !== null) {
         // 미팅 프로필 존재
-        meetingFavorList.push({userId: u.id, ranking: favor.sumFavor, rankingSex: u.sex});
+        meetingFavorList.push({userId: u.id, ranking: meetingFavor.sumFavor, rankingSex: u.sex});
         // 미팅 월 평균 별점 추가
         if (rankingType === RankingType.MONTH) {
           const avgRating = await this.calcUserAvgRating(u.id, startDate, endDate);
           meetingRatingList.push({userId: u.id, avgRating, rankingSex: u.sex});
         }
       }
+      if(learningFavor !== null) {
+        learningRatingList.push({userId: u.id, ranking: learningFavor.sum, rankingSex: u.sex});
+      }
     }
     meetingFavorList.sort((a: any, b: any) => a.ranking - b.ranking);
 
-    //러닝
+
     //취미
     const hobbyRankingList = await this.calcHobbyRoomRanking();
 
@@ -173,6 +182,17 @@ export class RankingUserController {
         rankingValue: v.avgRating,
         rankingServiceType: ServiceType.MEETING,
         rankingType: RankingType.MONTH_RATING,
+        rankingDate: rankingDate,
+        rankingSex: v.rankingSex,
+        rankingShow: true,
+      }));
+    });
+    learningRatingList.forEach((v) => {
+      rankingList.push(new RankingUser({
+        rankingUserId: v.userId,
+        rankingValue: v.ranking,
+        rankingServiceType: ServiceType.LEARNING,
+        rankingType: rankingType,
         rankingDate: rankingDate,
         rankingSex: v.rankingSex,
         rankingShow: true,

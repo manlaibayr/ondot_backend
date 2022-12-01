@@ -41,3 +41,6 @@ export * from './learning-question-comment.repository';
 export * from './learning-question.repository';
 export * from './store-product.repository';
 export * from './point-setting.repository';
+export * from './banner.repository';
+export * from './hobby-category.repository';
+export * from './learning-category.repository';

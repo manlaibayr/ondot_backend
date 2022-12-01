@@ -71,6 +71,11 @@ export class StoreProduct extends Entity {
   @property({
     type: 'date',
   })
+  updatedAt?: Date;
+
+  @property({
+    type: 'date',
+  })
   createdAt?: string;
 
 

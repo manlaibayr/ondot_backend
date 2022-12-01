@@ -14,6 +14,7 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Server} from 'socket.io';
+import {NotificationController} from './notification.controller';
 
 export class GiftGoodsController {
   constructor(
@@ -24,6 +25,7 @@ export class GiftGoodsController {
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(GiftHistoryRepository) public giftHistoryRepository: GiftHistoryRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
   ) {
   }
 
@@ -188,6 +190,7 @@ export class GiftGoodsController {
       msg: userMeetingProfile?.meetingNickname + `님에게서 상품(${giftingInfo.goods_nm})을 받았습니다.`,
       icon: userMeetingProfile?.meetingPhotoMain,
     });
+    await this.notificationController.sendPushNotification(otherUserId, '선물을 받았습니다.', userMeetingProfile?.meetingNickname + `님에게서 상품(${giftingInfo.goods_nm})을 받았습니다.`);
     return {payFlower: userInfo.payFlower - giftingFlower};
   }
 

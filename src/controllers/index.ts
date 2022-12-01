@@ -26,3 +26,5 @@ export * from './learning-profile.controller';
 export * from './learning-review.controller';
 export * from './learning-question.controller';
 export * from './store-product.controller';
+export * from './banner.controller';
+export * from './category.controller';

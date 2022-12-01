@@ -32,6 +32,8 @@ const signAsync = promisify(sign);
 const bcrypt = require('bcrypt');
 const randomstring = require('randomstring');
 
+
+
 export class UserController {
   constructor(
     @inject(RestBindings.Http.RESPONSE) private responseObj: Response,

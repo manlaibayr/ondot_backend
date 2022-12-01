@@ -21,6 +21,17 @@ export class Notice extends Entity {
   noticeContent?: string;
 
   @property({
+    type: 'boolean',
+    default: true,
+  })
+  noticeStatus?: boolean;
+
+  @property({
+    type: 'date',
+  })
+  updatedAt?: Date;
+
+  @property({
     type: 'date',
     default: "$now"
   })

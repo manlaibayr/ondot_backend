@@ -22,6 +22,7 @@ import {Utils} from '../utils';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace, Server} from 'socket.io';
 import {FlowerController} from './flower.controller';
+import {NotificationController} from './notification.controller';
 
 
 export class LearningProfileController {
@@ -37,6 +38,7 @@ export class LearningProfileController {
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
     @inject(`controllers.FlowerController`) private flowerController: FlowerController,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
   ) {
   }
 
@@ -440,6 +442,7 @@ export class LearningProfileController {
       contactId: chatContactInfo.id,
       chatType: ChatType.HOBBY_CHAT,
     });
+    await this.notificationController.sendPushNotification(userId, myLearningInfo?.learningNickname + '님', myLearningInfo?.learningNickname + '님이 대화신청을 보냈습니다.');
   }
 
 }

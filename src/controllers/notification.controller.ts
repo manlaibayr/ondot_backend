@@ -1,10 +1,5 @@
-// Uncomment these imports to begin using these cool features!
-
-// import {inject} from '@loopback/core';
-
-
 import {repository} from '@loopback/repository';
-import {MeetingProfileRepository, NotificationRepository} from '../repositories';
+import {MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
 import {del, get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {Getter, inject} from '@loopback/core';
@@ -13,14 +8,28 @@ import {UserProfile} from '@loopback/security';
 import {ServiceType, UserCredentials} from '../types';
 import {NotificationWithRelations} from '../models';
 import {LearningProfileController} from './learning-profile.controller';
+import * as firebaseAdmin from 'firebase-admin';
+import {CONFIG} from '../config';
+
+/**
+ * firebase admin init
+ */
+firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.cert(CONFIG.firebaseAdminServiceKey as firebaseAdmin.ServiceAccount)});
 
 export class NotificationController {
   constructor(
+    @repository(UserRepository) private userRepository: UserRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
+
+  public async sendPushNotification(userId: string, title: string, body: string) {
+    const userInfo = await this.userRepository.findById(userId, {fields: ['pushToken']});
+    if(userInfo.pushToken) firebaseAdmin.messaging().sendToDevice(userInfo.pushToken , {notification: {title: title, body: body}}).then(() => null);
+  }
+
 
   @get('/notifications/list')
   @secured(SecuredType.IS_AUTHENTICATED)

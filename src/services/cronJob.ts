@@ -27,6 +27,7 @@ class EveryDayCronJob extends CronJob {
         await rankingUserController.cronUserTotalLike();
 
         // 매일 회원들 나이 다시 반영
+
         
         //일요일이면 주간 랭킹 처리
         if(moment().day() === 0) {

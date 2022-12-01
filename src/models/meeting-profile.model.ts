@@ -184,6 +184,12 @@ export class MeetingProfile extends Entity {
     type: 'number',
     default: 0
   })
+  meetingAdminAdd?: number;
+
+  @property({
+    type: 'number',
+    default: 0
+  })
   meetingRanking?: number;
 
   @property({

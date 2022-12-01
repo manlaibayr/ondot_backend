@@ -53,13 +53,29 @@ export class WebrtcControllerWs {
           throw new Error('token is invalid');
         }
         this.chatContactId = this.socket.client.request.headers.chatcontactid;
-        this.socket.join(this.chatContactId);
         const contactInfo = await this.chatContactRepository.findById(this.chatContactId);
         this.meUserId = user.id;
         this.otherUserId = contactInfo.contactUserId === user.id ? contactInfo.contactOtherUserId : contactInfo.contactUserId;
         const meMeetingProfile = await this.meetingProfileRepository.findOne({where: {userId: user.id}});
         if (!meMeetingProfile) throw new HttpErrors.BadRequest('회원정보가 정확하지 않습니다.');
         this.meInfo = {id: meMeetingProfile.userId, profile: meMeetingProfile.meetingPhotoMain, nickname: meMeetingProfile.meetingNickname};
+
+        if(this.socket.client.request.headers.calltype === 'CALLER') {
+          // 상대회원이 통화중인지 아닌지 확인
+          // 접속한 회원 리스트
+          const rooms: any = this.socket.adapter.rooms;
+          const onlineIds = Object.keys(rooms).filter((v) => v[0] !== '/');
+          if (onlineIds.indexOf(this.otherUserId) !== -1) {
+            // 이미 통화중인 상태
+            console.log('이미 통화중인 상태')
+            // this.socket.emit(ChatSocketMsgType.SRV_WEBRTC_OTHER_BUSY, '');
+            this.socket.emit(ChatSocketMsgType.SRV_WEBRTC_REJECTED, '');
+            this.socket.disconnect();
+            return;
+          }
+        }
+        this.socket.join(this.chatContactId);
+        this.socket.join(user.id);
       } catch (e) {
         console.error(e);
         this.socket.disconnect();
@@ -71,8 +87,8 @@ export class WebrtcControllerWs {
   }
 
   @ws.subscribe('CLIENT_WEBRTC_CALLER_JOIN')
-  async webrtcJoin(
-  ) {
+  async webrtcJoin() {
+    console.log('호출자 입장~~~~~~~~~~~')
   }
 
   @ws.subscribe('CLIENT_WEBRTC_CALLEE_JOIN')

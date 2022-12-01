@@ -72,6 +72,11 @@ export class Ad extends Entity {
   adShow: boolean;
 
   @property({
+    type: 'number',
+  })
+  adSequence: number;
+
+  @property({
     type: 'date',
     default: "$now"
   })

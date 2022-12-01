@@ -40,6 +40,7 @@ export enum FlowerHistoryType {
   ATTENDANCE = 'ATTENDANCE',    // 출석체크
   VIEW_AD = 'VIEW_AD',    // 광고열람보상
   FLOWER_CHARGE = 'FLOWER_CHARGE',      // 유료플라워 충전
+  FLOWER_REFUND = 'FLOWER_REFUND',      // 유료플라워 환전
   GIVE_FLOWER = 'GIVE_FLOWER',   // 플라워선물보내기
   RECEIVE_FLOWER = 'RECEIVE_FLOWER', // 플라워선물받기
   SEND_GIFT = 'SEND_GIFT',    // 기프트보내기
@@ -57,6 +58,7 @@ export enum FlowerHistoryType {
 }
 
 export enum ServiceType {
+  COMMON = 'COMMON',
   MEETING = 'MEETING',
   LEARNING = 'LEARNING',
   HOBBY = 'HOBBY'
@@ -111,6 +113,7 @@ export enum ChatSocketMsgType {
   SRV_CONTACT_INFO = 'SRV_CONTACT_INFO',
   SRV_CONTACT_CHANGE = 'SRV_CONTACT_CHANGE',
   SRV_RECEIVE_MSG = 'SRV_RECEIVE_MSG',
+  SRV_VOICE_CALL_START = 'SRV_VOICE_CALL_START',
   SRV_JOIN_VOICE_CALL = 'SRV_JOIN_VOICE_CALL',
   SRV_WEBRTC_OTHER_JOIN = 'SRV_WEBRTC_OTHER_JOIN',  // 상대가 음성채팅화면에 진입
   SRV_WEBRTC_CALLEE_JOINED = 'SRV_WEBRTC_CALLEE_JOINED',
@@ -119,6 +122,7 @@ export enum ChatSocketMsgType {
   SRV_WEBRTC_CANDIDATE = 'SRV_WEBRTC_CANDIDATE',
   SRV_WEBRTC_REJECTED = 'SRV_WEBRTC_REJECTED',
   SRV_WEBRTC_FINISH = 'SRV_WEBRTC_FINISH',
+  SRV_WEBRTC_OTHER_BUSY = 'SRV_WEBRTC_OTHER_BUSY',  // 상대가 통화중
 }
 
 export enum NotificationType {
@@ -193,4 +197,10 @@ export enum PointSettingType {
   POINT_MEETING_PROFILE = 'POINT_MEETING_PROFILE',
   POINT_PUT_IDEA = 'POINT_PUT_IDEA',
   POINT_SIGNUP = 'POINT_SIGNUP',
+}
+
+export enum BannerType {
+  MENU = 'MENU', // 메뉴연결
+  LINK = 'LINK', // 외부링크
+  POPUP = 'POPUP', // 팝업
 }

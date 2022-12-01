@@ -53,6 +53,11 @@ export class GiftHistory extends Entity {
 
   @property({
     type: 'date',
+  })
+  updatedAt?: Date;
+
+  @property({
+    type: 'date',
     default: "$now"
   })
   createdAt?: Date;

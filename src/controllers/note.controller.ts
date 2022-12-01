@@ -10,6 +10,7 @@ import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace} from 'socket.io';
 import {FlowerController} from './flower.controller';
 import {Utils} from '../utils';
+import {NotificationController} from './notification.controller';
 
 export class NoteController {
   constructor(
@@ -22,6 +23,7 @@ export class NoteController {
     @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(`controllers.FlowerController`) private flowerController: FlowerController,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
   ) {
   }
 
@@ -101,6 +103,7 @@ export class NoteController {
     nspMain.to(data.otherId).emit(MainSocketMsgType.SRV_RECEIVE_NOTE, {
       userId: currentUser.userId, nickname: nickname, profile: profile, age: age, noteMsg: data.text, noteId: noteId,
     });
+    await this.notificationController.sendPushNotification(data.otherId, nickname + '님', data.text);
   }
 
   @post('/notes/{id}/answer')
@@ -126,5 +129,6 @@ export class NoteController {
     nspMain.to(noteInfo.noteUserId).emit(MainSocketMsgType.SRV_RECEIVE_NOTE, {
       userId: currentUser.userId, nickname: meMeetingInfo?.meetingNickname, profile: meMeetingInfo?.meetingPhotoMain, age: meMeetingInfo?.age, noteMsg: data.text, noteAnswerMsg: data.text,
     });
+    await this.notificationController.sendPushNotification(noteInfo.noteUserId, meMeetingInfo?.meetingNickname + '님', data.text);
   }
 }

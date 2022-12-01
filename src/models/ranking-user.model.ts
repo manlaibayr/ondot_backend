@@ -62,6 +62,12 @@ export class RankingUser extends Entity {
   rankingShow: boolean;
 
   @property({
+    type: 'number',
+    default: 0
+  })
+  rankingAdminAdd: number;
+
+  @property({
     type: 'date',
     default: "$now"
   })

@@ -10,6 +10,7 @@ import {Namespace, Server} from 'socket.io';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {FlowerController} from './flower.controller';
 import {Utils} from '../utils';
+import {NotificationController} from './notification.controller';
 
 export class MeetingController {
   constructor(
@@ -21,7 +22,8 @@ export class MeetingController {
     @repository(BlockPhoneRepository) public blockPhoneRepository: BlockPhoneRepository,
     @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
-    @inject(`controllers.FlowerController`) private flowerController: FlowerController
+    @inject(`controllers.FlowerController`) private flowerController: FlowerController,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
   ) {
   }
 
@@ -179,5 +181,6 @@ export class MeetingController {
       contactId: chatContactInfo.id,
       chatType: ChatType.HOBBY_CHAT
     });
+    await this.notificationController.sendPushNotification(userId, myMeetingInfo?.meetingNickname + '님', myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.');
   }
 }

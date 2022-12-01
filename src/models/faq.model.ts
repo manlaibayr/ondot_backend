@@ -1,4 +1,5 @@
 import {Entity, model, property} from '@loopback/repository';
+import {ServiceType} from '../types';
 
 @model()
 export class Faq extends Entity {
@@ -19,6 +20,25 @@ export class Faq extends Entity {
     type: 'string',
   })
   faqContent?: string;
+
+  @property({
+    type: 'string',
+    jsonSchema: {
+      enum: Object.values(ServiceType),
+    },
+  })
+  faqServiceType?: ServiceType;
+
+  @property({
+    type: 'boolean',
+    default: true,
+  })
+  faqStatus?: boolean;
+
+  @property({
+    type: 'date',
+  })
+  updatedAt?: Date;
 
   @property({
     type: 'date',

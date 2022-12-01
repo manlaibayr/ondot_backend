@@ -198,6 +198,12 @@ export class LearningProfile extends Entity {
     type: 'number',
     default: 0
   })
+  learningAdminAdd?: number;
+
+  @property({
+    type: 'number',
+    default: 0
+  })
   learningRanking?: number;
 
   @property({

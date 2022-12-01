@@ -132,6 +132,11 @@ export class User extends Entity {
   @property({
     type: 'date',
   })
+  signOutDate?: Date;
+
+  @property({
+    type: 'date',
+  })
   updatedAt?: Date;
 
   @property({

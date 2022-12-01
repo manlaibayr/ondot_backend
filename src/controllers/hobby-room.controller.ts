@@ -50,7 +50,7 @@ export class HobbyRoomController {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const hobbyProfile = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
     const filter: Filter<HobbyRoom> = {};
-    filter.where = {isRoomDelete: false};
+    filter.where = {isRoomDelete: false, roomIsShow: true};
     if (searchType === 'findCategory') {
     } else if (searchType === 'sameRegion') {
       filter.order = ['createdAt desc'];
@@ -64,6 +64,17 @@ export class HobbyRoomController {
       filter.where.roomCategory = searchCategory;
     }
     const roomList = await this.hobbyRoomRepository.find(filter);
+    if(searchType === 'sameRegion') {
+      const userRegion = hobbyProfile?.hobbyResidence ?? '';
+      const getSameCharCount = (str1: string, str2: string) => {
+        let count = 0;
+        for(let i = 0; i < str1.length; i++) {
+          if(str2.indexOf(str1[i]) !== -1) count++;
+        }
+        return count;
+      };
+      roomList.sort((a: HobbyRoom, b: HobbyRoom) => getSameCharCount(userRegion, a.roomRegion) - getSameCharCount(userRegion, b.roomRegion));
+    }
     return roomList.map((room) => ({
       id: room.id,
       roomTitle: room.roomTitle,

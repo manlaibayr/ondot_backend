@@ -10,7 +10,6 @@ import {CONFIG} from '../config';
 import CryptoJs from 'crypto-js';
 import * as crypto from 'crypto';
 
-
 export class Utils {
 
   public static calcUseFlower(freeFlower: number, payFlower: number, needFlower: number): {
@@ -103,5 +102,4 @@ export class Utils {
     const decrypted = crypto.privateDecrypt({key: CONFIG.gifting.rsaPrivateKey, padding: crypto.constants.RSA_PKCS1_PADDING}, Buffer.from(encStr, 'base64'));
     return decrypted.toString('utf8');
   }
-
 }
