@@ -335,6 +335,7 @@ export class RankingUserController {
       filter.include.push({relation: 'hobbyRoom'});
     }
     const rankingList = await this.rankingUserRepository.find(filter);
+    rankingList.sort((a, b) => ((b.rankingValue + b.rankingAdminAdd) - (a.rankingValue + a.rankingAdminAdd)));
     if (data.serviceType === ServiceType.MEETING) {
       return rankingList.map((v) => ({
         id: v.meetingProfile?.id,

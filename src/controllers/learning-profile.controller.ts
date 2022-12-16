@@ -440,7 +440,7 @@ export class LearningProfileController {
       callUserName: myLearningInfo?.learningNickname,
       callUserProfile: myLearningInfo?.learningNickname,
       contactId: chatContactInfo.id,
-      chatType: ChatType.HOBBY_CHAT,
+      chatType: ChatType.LEARNING_CHAT,
     });
     await this.notificationController.sendPushNotification(userId, myLearningInfo?.learningNickname + '님', myLearningInfo?.learningNickname + '님이 대화신청을 보냈습니다.');
   }

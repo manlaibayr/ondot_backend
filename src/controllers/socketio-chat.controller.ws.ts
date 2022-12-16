@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import moment from 'moment';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {CONFIG} from '../config';
-import {ChatMsg, User, Verifytoken} from '../models';
+import {User, Verifytoken} from '../models';
 import {
   BlockUserRepository,
   ChatContactRepository,
@@ -13,14 +13,14 @@ import {
   ChatMsgRepository,
   HobbyProfileRepository,
   HobbyRoomMemberRepository,
-  HobbyRoomRepository, LearningProfileRepository,
+  HobbyRoomRepository,
+  LearningProfileRepository,
   MeetingProfileRepository,
   UserRepository,
   VerifytokenRepository,
 } from '../repositories';
 import {ChatMsgStatus, ChatMsgType, ChatSocketMsgType, ChatType, ContactStatus, MainSocketMsgType, RoomMemberJoinType, ServiceType, UserType} from '../types';
 import {LearningProfileController} from './learning-profile.controller';
-import {Utils} from '../utils';
 import {inject} from '@loopback/core';
 import {NotificationController} from './notification.controller';
 
@@ -72,6 +72,7 @@ export class ChatControllerWs {
       const otherInfo = {id: otherProfile?.userId, profile: otherProfile?.meetingPhotoMain, nickname: otherProfile?.meetingNickname, isBlock: !!otherBlock, pushToken: otherUserInfo?.pushToken};
       return {
         meProfile: meInfo,
+        isContactReqStatus: contactInfo.contactUserId === userId ? contactInfo.contactStatus === ContactStatus.REQUEST : contactInfo.contactOtherStatus === ContactStatus.REQUEST,
         otherProfile: otherInfo,
         waitAllowRequest: contactInfo.contactOtherUserId === userId && contactInfo.contactStatus === ContactStatus.REQUEST,
         otherDeleted: !!meBlock || (contactInfo.contactUserId === userId ? (contactInfo.contactOtherStatus === ContactStatus.DELETE) : (contactInfo.contactStatus === ContactStatus.DELETE)),

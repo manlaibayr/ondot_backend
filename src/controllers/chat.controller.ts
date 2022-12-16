@@ -55,6 +55,15 @@ export class ChatController {
     if (currentUser.userId !== contactInfo.contactOtherUserId && currentUser.userId !== contactInfo.contactUserId) throw new HttpErrors.BadRequest('요청이 승인되지 않았습니다.');
     if (type === 'allow') {
       await this.chatContactRepository.updateById(chatContactId, {contactStatus: ContactStatus.ALLOW, contactOtherStatus: ContactStatus.ALLOW});
+      const myMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
+      nspMain.to(otherUserId).emit(MainSocketMsgType.SRV_ALLOW_CHAT, {
+        callUserId: currentUser.userId,
+        callUserName: myMeetingInfo?.meetingNickname,
+        callUserProfile: myMeetingInfo?.meetingPhotoMain,
+        contactId: chatContactId,
+        chatType: ChatType.MEETING_CHAT
+      });
+      nspChat.to(chatContactId).emit(ChatSocketMsgType.SRV_CONTACT_CHANGE, {});
     } else if (type === 'reject') {
       await this.chatContactRepository.updateById(chatContactId, {
         contactStatus: contactInfo.contactUserId === currentUser.userId ? ContactStatus.REJECT : ContactStatus.REJECTED,

@@ -44,3 +44,4 @@ export * from './point-setting.model';
 export * from './banner.model';
 export * from './hobby-category.model';
 export * from './learning-category.model';
+export * from './referee-log.model';

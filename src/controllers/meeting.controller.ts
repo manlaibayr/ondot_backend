@@ -150,8 +150,20 @@ export class MeetingController {
         contactOtherUserId: userId,
         contactStatus: ContactStatus.REQUEST,
         contactOtherStatus: ContactStatus.REQUESTED,
-        contactServiceType: ServiceType.MEETING
+        contactServiceType: ServiceType.MEETING,
+        contactRequestNumber: 0,
       });
+    } else {
+      if(chatContactInfo.contactStatus !== ContactStatus.ALLOW && chatContactInfo.contactStatus !== ContactStatus.REQUEST && chatContactInfo.contactRequestNumber < 2) {
+        // 3번이하로 시도했으면
+        await this.chatContactRepository.updateById(chatContactInfo.id, {
+          contactStatus: ContactStatus.REQUEST,
+          contactOtherStatus: ContactStatus.REQUESTED,
+          contactRequestNumber: chatContactInfo.contactRequestNumber + 1
+        });
+      } else {
+        throw new HttpErrors.BadRequest('대화신청을 할수 없습니다.');
+      }
     }
 
     if(!hasMeetingPass) {
@@ -179,7 +191,7 @@ export class MeetingController {
       callUserName: myMeetingInfo?.meetingNickname,
       callUserProfile: myMeetingInfo?.meetingPhotoMain,
       contactId: chatContactInfo.id,
-      chatType: ChatType.HOBBY_CHAT
+      chatType: ChatType.MEETING_CHAT
     });
     await this.notificationController.sendPushNotification(userId, myMeetingInfo?.meetingNickname + '님', myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.');
   }

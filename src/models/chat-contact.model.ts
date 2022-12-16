@@ -50,6 +50,12 @@ export class ChatContact extends Entity {
   contactServiceType: ServiceType;
 
   @property({
+    type: 'number',
+    default: 0,
+  })
+  contactRequestNumber: number;
+
+  @property({
     type: 'date',
     default: "$now"
   })

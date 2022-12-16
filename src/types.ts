@@ -54,6 +54,7 @@ export enum FlowerHistoryType {
   TEACHER_REVIEW = 'TEACHER_REVIEW', // 선생의 후기작성 보상
   QUESTION_COMMENT = 'QUESTION_COMMENT', // 질문에 답글달기
   PASS_PURCHASE = 'PASS_PURCHASE', // 이용권구매
+  REFEREE_GET = 'REFEREE_GET',  // 추천인에게 주는 포인트 
   NORMAL = 'NORMAL'
 }
 
@@ -101,6 +102,7 @@ export enum ReportType {
 
 export enum MainSocketMsgType {
   SRV_REQUEST_CHAT = 'SRV_REQUEST_CHAT',
+  SRV_ALLOW_CHAT = 'SRV_ALLOW_CHAT',
   SRV_RECEIVE_NOTE = 'SRV_RECEIVE_NOTE',
   SRV_OTHER_USER_CHAT = 'SRV_OTHER_USER_CHAT',
   SRV_CHANGE_CONTACT_LIST = 'SRV_CHANGE_CONTACT_LIST',
@@ -197,6 +199,7 @@ export enum PointSettingType {
   POINT_MEETING_PROFILE = 'POINT_MEETING_PROFILE',
   POINT_PUT_IDEA = 'POINT_PUT_IDEA',
   POINT_SIGNUP = 'POINT_SIGNUP',
+  POINT_REFEREE = 'POINT_REFEREE',
 }
 
 export enum BannerType {

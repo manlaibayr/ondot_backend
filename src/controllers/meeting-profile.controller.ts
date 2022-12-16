@@ -6,7 +6,7 @@ import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import axios from 'axios';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, FlowerHistoryType, PointSettingType, ServiceType, UserCredentials} from '../types';
+import {ContactStatus, FileUploadHandler, FlowerHistoryType, PointSettingType, ServiceType, UserCredentials} from '../types';
 import {MeetingProfile} from '../models';
 import {
   BlockPhoneRepository,
@@ -14,7 +14,8 @@ import {
   ChatContactRepository,
   FlowerHistoryRepository,
   LikeRepository,
-  MeetingProfileRepository, PointSettingRepository,
+  MeetingProfileRepository,
+  PointSettingRepository,
   RatingRepository,
   UsagePassRepository,
   UserRepository,
@@ -199,7 +200,7 @@ export class MeetingProfileController {
     let otherProfile = await this.meetingProfileRepository.findOne({where: {userId: id}});
     if (!otherProfile) otherProfile = await this.meetingProfileRepository.findById(id);
     const likeInfo = await this.likeRepository.findOne({where: {likeUserId: currentUser.userId, likeOtherUserId: otherProfile.userId, likeServiceType: ServiceType.MEETING}});
-    const meetingChatList = await this.chatContactRepository.findOne(
+    const meetingChatInfo = await this.chatContactRepository.findOne(
       {
         where: {
           or: [{contactUserId: currentUser.userId, contactOtherUserId: otherProfile.userId}, {contactUserId: otherProfile.userId, contactOtherUserId: currentUser.userId}],
@@ -207,12 +208,13 @@ export class MeetingProfileController {
         },
       },
     );
+    const isAvailableContactReq = !meetingChatInfo || (meetingChatInfo?.contactStatus !== ContactStatus.ALLOW && meetingChatInfo?.contactStatus !== ContactStatus.REQUEST && meetingChatInfo?.contactRequestNumber < 2);
     const ratingCount = await this.ratingRepository.count({ratingUserId: currentUser.userId, ratingOtherUserId: otherProfile.userId});
     const blockInfo = await this.blockUserRepository.findOne({where: {blockUserId: currentUser.userId, blockOtherUserId: otherProfile.userId, blockServiceType: ServiceType.MEETING}});
     const data: any = otherProfile.toJSON();
     data.meetingResidence = data.meetingResidence.split(' ').slice(0, 2).join(' ');
     data.isLike = !!likeInfo;
-    data.isChat = !!meetingChatList;
+    data.isChat = !isAvailableContactReq;
     data.isGiveRating = ratingCount.count > 0;
     data.isBlock = !!blockInfo;
     data.totalFavor = await this.rankingUserController.calcUserMeetingTotalFavor(otherProfile.userId);

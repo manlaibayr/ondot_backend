@@ -13,12 +13,13 @@ import AppleAuth from 'apple-auth';
 import {CONFIG} from '../config';
 import {secured, SecuredType} from '../role-authentication';
 import {FILE_UPLOAD_SERVICE} from '../keys';
-import {FileUploadHandler, PointSettingType, SignupType, UserCredentials, UserStatusType, UserType} from '../types';
+import {FileUploadHandler, FlowerHistoryType, PointSettingType, SignupType, UserCredentials, UserStatusType, UserType} from '../types';
 import {
+  FlowerHistoryRepository,
   HobbyProfileRepository,
   LearningProfileRepository,
   MeetingProfileRepository,
-  PointSettingRepository,
+  PointSettingRepository, RefereeLogRepository,
   RolemappingRepository,
   UserRepository,
   VerifyCodeRepository,
@@ -33,7 +34,6 @@ const bcrypt = require('bcrypt');
 const randomstring = require('randomstring');
 
 
-
 export class UserController {
   constructor(
     @inject(RestBindings.Http.RESPONSE) private responseObj: Response,
@@ -45,6 +45,8 @@ export class UserController {
     @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
     @repository(LearningProfileRepository) private learningProfileRepository: LearningProfileRepository,
     @repository(PointSettingRepository) private pointSettingRepository: PointSettingRepository,
+    @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
+    @repository(RefereeLogRepository) public refereeLogRepository: RefereeLogRepository,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
@@ -149,7 +151,7 @@ export class UserController {
       signUpInfo.niceAuthResp.tokenVersionId, signUpInfo.niceAuthResp.encData, signUpInfo.niceAuthResp.integrityValue, signUpInfo.niceAuthResp.token);
     const checkRealUserInfo = await this.userRepository.findOne({where: {realUserId: niceInfo.realUserId}});
     if (checkRealUserInfo) {
-      if(checkRealUserInfo.userStatus === UserStatusType.LEAVE) {
+      if (checkRealUserInfo.userStatus === UserStatusType.LEAVE) {
         throw new HttpErrors.BadRequest('이미 삭제된 계정입니다. 다시 가입하시려면 관리자에게 문의하세요.');
       } else if (checkRealUserInfo.signupType === signUpInfo.type) {
         throw new HttpErrors.BadRequest(niceInfo.name + `님은 이미 ${checkRealUserInfo.email}으로 이미 가입이 되있으십니다.`);
@@ -170,11 +172,42 @@ export class UserController {
       isForeign: niceInfo.isForeign,
       signupType: userData.signupType,
       phoneNumber: signUpInfo.phoneNumber,
+      userRefereeId: randomstring.generate(8),
       refereeEmail: signUpInfo.refereeEmail,
       userType: UserType.USER,
       userStatus: UserStatusType.NORMAL,
       freeFlower: signupPoint.pointSettingAmount,
     });
+    if (signUpInfo.refereeEmail) {
+      const refereeUserInfo = await this.userRepository.findOne({where: {userRefereeId: signUpInfo.refereeEmail}});
+      if (refereeUserInfo) {
+        const refereePointInfo = await this.pointSettingRepository.findById(PointSettingType.POINT_REFEREE);
+        const refereePoint = refereePointInfo.pointSettingAmount;
+        await this.userRepository.updateById(refereeUserInfo.id, {freeFlower: refereeUserInfo.freeFlower + refereePoint});
+        await this.userRepository.updateById(userInfo.id, {freeFlower: userInfo.freeFlower + refereePoint});
+        await this.flowerHistoryRepository.createAll([
+          {
+            flowerUserId: refereeUserInfo.id,
+            flowerContent: '추천인으로 부터 받음',
+            flowerValue: refereePoint,
+            isFreeFlower: true,
+            flowerHistoryType: FlowerHistoryType.REFEREE_GET,
+          },
+          {
+            flowerUserId: userInfo.id,
+            flowerContent: '추천인을 제출하여 받음',
+            flowerValue: refereePoint,
+            isFreeFlower: true,
+            flowerHistoryType: FlowerHistoryType.REFEREE_GET,
+          },
+        ]);
+        await this.refereeLogRepository.create({
+          refereeLogUserId: userInfo.id,
+          refereeLogOtherUserId: refereeUserInfo.id,
+          refereeLogIdValue: signUpInfo.refereeEmail
+        });
+      }
+    }
     await this.rolemappingRepository.create({user_id: userInfo.id, role_id: UserType.USER});
     return {
       result: 'success',
@@ -273,6 +306,7 @@ export class UserController {
       phoneNumber: userInfo.phoneNumber,
       freeFlower: userInfo.freeFlower,
       payFlower: userInfo.payFlower,
+      userRefereeId: userInfo.userRefereeId,
       profile: {
         meeting: profileMeeting,
         hobby: profileHobby,

@@ -71,6 +71,11 @@ export class User extends Entity {
   @property({
     type: 'string',
   })
+  userRefereeId?: string;
+
+  @property({
+    type: 'string',
+  })
   refereeEmail?: string;
 
   @property({
