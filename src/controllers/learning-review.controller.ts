@@ -1,12 +1,13 @@
 import {Filter, repository} from '@loopback/repository';
 import {param, get, post, requestBody} from '@loopback/rest';
 import {LearningReview} from '../models';
-import {FlowerHistoryRepository, LearningProfileRepository, LearningReviewRepository, PointSettingRepository, UserRepository} from '../repositories';
+import {FlowerHistoryRepository, LearningProfileRepository, LearningReviewRepository, NotificationRepository, PointSettingRepository, UserRepository} from '../repositories';
 import {secured, SecuredType} from '../role-authentication';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
-import {FlowerHistoryType, PointSettingType, UserCredentials} from '../types';
+import {FlowerHistoryType, NotificationType, PointSettingType, ServiceType, UserCredentials} from '../types';
+import {NotificationController} from './notification.controller';
 
 export class LearningReviewController {
   constructor(
@@ -15,6 +16,8 @@ export class LearningReviewController {
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(LearningProfileRepository) public learningProfileRepository: LearningProfileRepository,
     @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
+    @repository(NotificationRepository) public notificationRepository: NotificationRepository,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {}
 
@@ -39,6 +42,7 @@ export class LearningReviewController {
     @requestBody() data: {teacherUserId: string, reviewValue: number, content?: string, hideName?: boolean}
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const myLearningProfile = await this.learningProfileRepository.findOne({where: {userId: currentUser.userId}});
     const teacherProfile = await this.learningProfileRepository.findOne({where: {userId: data.teacherUserId}});
     const reviewInfo = await this.learningReviewRepository.create({
       reviewStudentUserId: currentUser.userId,
@@ -54,6 +58,16 @@ export class LearningReviewController {
       flowerUserId: currentUser.userId, flowerContent: teacherProfile?.learningNickname + ' 선생님 후기작성 보상', flowerValue: addFlower, isFreeFlower: true,
       flowerHistoryType: FlowerHistoryType.TEACHER_REVIEW, flowerHistoryRefer: reviewInfo.id,
     });
+
+    await this.notificationRepository.create({
+      notificationSendUserId: currentUser.userId,
+      notificationReceiveUserId: data.teacherUserId,
+      notificationMsg: myLearningProfile?.learningNickname + '학생이 후기를 등록했어요.',
+      notificationType: NotificationType.LEARNING_DIBS,
+      notificationServiceType: ServiceType.LEARNING,
+      notificationDesc: reviewInfo.id,
+    });
+    await this.notificationController.sendPushNotification(data.teacherUserId, myLearningProfile?.learningNickname + '님', myLearningProfile?.learningNickname + '학생이 후기를 등록했어요.');
     return {flower: addFlower};
   }
 }

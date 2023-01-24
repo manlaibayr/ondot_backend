@@ -28,7 +28,7 @@ export class LearningQuestionController {
     @requestBody() data: {title: string, content: string},
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    return this.learningQuestionRepository.create({questionUserId: currentUser.userId, questionTitle: data.title, questionContent: data.content, questionCommentCount: 0});
+    await this.learningQuestionRepository.create({questionUserId: currentUser.userId, questionTitle: data.title, questionContent: data.content, questionCommentCount: 0});
   }
 
   @get('/learning-questions/{id}')

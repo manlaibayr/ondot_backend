@@ -23,6 +23,7 @@ import {HobbyRoom, HobbyRoomWithRelations} from '../models';
 import {ws} from '../websockets/decorators/websocket.decorator';
 import {Server} from 'socket.io';
 import {Utils} from '../utils';
+import {NotificationController} from './notification.controller';
 
 export class HobbyRoomController {
   constructor(
@@ -36,8 +37,28 @@ export class HobbyRoomController {
     @repository(HobbyRoomDibsRepository) public hobbyRoomDibsRepository: HobbyRoomDibsRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(ChatGroupMsgRepository) public chatGroupMsgRepository: ChatGroupMsgRepository,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
+  }
+
+  public async procExpiredRooms() {
+    // 매일 취미방 완료날짜 처리
+    const soonExpiredRoomList = await this.hobbyRoomRepository.find({where: {isRoomDelete: false, roomExpiredDate: {lt: moment().add(2, 'weeks').toDate()}}});
+    const notificationList = [];
+    if(soonExpiredRoomList.length > 0) {
+      for (const roomInfo of soonExpiredRoomList) {
+        await this.notificationController.sendPushNotification(roomInfo.userId, roomInfo.roomTitle, roomInfo.roomTitle + ' 모임이 곧 종료됩니다. 플라워포인트를 미리 충전해주세요.');
+        notificationList.push({
+          notificationReceiveUserId: roomInfo.userId,
+          notificationMsg: roomInfo.roomTitle + ' 모임이 곧 종료됩니다. 플라워포인트를 미리 충전해주세요.',
+          notificationType: NotificationType.NORMAL,
+          notificationServiceType: ServiceType.HOBBY,
+        })
+      }
+    }
+    await this.hobbyRoomRepository.updateAll({isRoomDelete: true}, {isRoomDelete: false, roomExpiredDate : {lt: new Date()}});
+    if(notificationList.length > 0) await this.notificationRepository.createAll(notificationList);
   }
 
   @get('/hobby-rooms')
@@ -544,16 +565,17 @@ export class HobbyRoomController {
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: roomInfo.userId,
-      notificationMsg: `${hobbyProfile?.hobbyNickname}님이 ${roomInfo.roomTitle}방 운영자님께 질문을 했습니다.`,
+      notificationMsg: `${hobbyProfile?.hobbyNickname}님이 ${roomInfo.roomTitle}방 운영자에게 질문을 보냈어요.`,
       notificationType: NotificationType.ROOM_QUESTION,
       notificationServiceType: ServiceType.HOBBY,
       notificationDesc: questionInfo.id,
     });
     nspMain.to(roomInfo.userId).emit(MainSocketMsgType.SRV_NOTIFICATION, {
       title: '취미방 질문',
-      msg: `${hobbyProfile?.hobbyNickname}님이 ${roomInfo.roomTitle}방 운영자님께 질문을 했습니다.`,
+      msg: `${hobbyProfile?.hobbyNickname}님이 ${roomInfo.roomTitle}방 운영자에게 질문을 보냈어요.`,
       icon: roomInfo.roomPhotoMain,
     });
+    await this.notificationController.sendPushNotification(roomInfo.userId, '취미방 질문', `${hobbyProfile?.hobbyNickname}님이 ${roomInfo.roomTitle}방 운영자에게 질문을 보냈어요.`);
   }
 
   @get('/hobby-rooms/question-info')
@@ -583,16 +605,17 @@ export class HobbyRoomController {
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: questionInfo.questionUserId,
-      notificationMsg: `${roomInfo.roomTitle}방 운영자님이 ${hobbyProfile?.hobbyNickname}님의 질문에 답변을 했습니다.`,
+      notificationMsg: `${roomInfo.roomTitle}방 운영자님이 ${hobbyProfile?.hobbyNickname}님의 질문에 답변을 보냈어요.`,
       notificationType: NotificationType.ROOM_ANSWER,
       notificationServiceType: ServiceType.HOBBY,
       notificationDesc: data.questionId,
     });
     nspMain.to(questionInfo.questionUserId).emit(MainSocketMsgType.SRV_NOTIFICATION, {
       title: '취미방 답변',
-      msg: `${roomInfo.roomTitle}방 운영자님이 ${hobbyProfile?.hobbyNickname}님의 질문에 답변을 했습니다.`,
+      msg: `${roomInfo.roomTitle}방 운영자님이 ${hobbyProfile?.hobbyNickname}님의 질문에 답변을 보냈어요.`,
       icon: roomInfo.roomPhotoMain,
     });
+    await this.notificationController.sendPushNotification(questionInfo.questionUserId, '취미방 답변', `${roomInfo.roomTitle}방 운영자님이 ${hobbyProfile?.hobbyNickname}님의 질문에 답변을 보냈어요.`);
   }
 
   @post('/hobby-rooms/{roomId}/member-change')

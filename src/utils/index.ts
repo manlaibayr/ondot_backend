@@ -9,6 +9,7 @@ import moment from 'moment';
 import {CONFIG} from '../config';
 import CryptoJs from 'crypto-js';
 import * as crypto from 'crypto';
+import sharp from 'sharp';
 
 export class Utils {
 
@@ -69,6 +70,16 @@ export class Utils {
       }
     });
     return files;
+  }
+
+  public static async makeThumb(filePath: string) {
+    try {
+      const thumbPath = path.join(path.dirname(filePath), path.basename(filePath, path.extname(filePath)) + '_thumb.jpg');
+      const imgMetaData = await sharp(filePath).metadata();
+      const thumbWidth = (imgMetaData.width && imgMetaData.width < 250) ? imgMetaData.width : 250;
+      await sharp(filePath).resize({width: thumbWidth}).jpeg({quality: 80}).toFile(thumbPath);
+      // eslint-disable-next-line no-empty
+    } catch (e) {}
   }
 
   public static getBetweenDate(year?: number, month?: number): [Date, Date] | undefined {

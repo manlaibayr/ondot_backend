@@ -24,8 +24,8 @@ export class GiftGoodsController {
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(GiftHistoryRepository) public giftHistoryRepository: GiftHistoryRepository,
-    @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
     @inject(`controllers.NotificationController`) private notificationController: NotificationController,
+    @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
 
@@ -158,16 +158,8 @@ export class GiftGoodsController {
       throw new HttpErrors.BadRequest(giftSendData.result_reason);
     }
 
-    const [updateUser, notificationInfo, giftHistoryInfo] = await Promise.all([
+    const [updateUser, giftHistoryInfo] = await Promise.all([
       this.userRepository.updateById(currentUser.userId, {payFlower: userInfo.payFlower - giftingFlower}),
-      this.notificationRepository.create({
-        notificationSendUserId: currentUser.userId,
-        notificationReceiveUserId: otherUserId,
-        notificationMsg: userMeetingProfile?.meetingNickname + `님에게서 선물(${giftingInfo.goods_nm})을 받았습니다.`,
-        notificationType: NotificationType.SENT_GIFTING,
-        notificationServiceType: ServiceType.MEETING,
-        notificationDesc: '',
-      }),
       this.giftHistoryRepository.create({
         id: giftHistoryId,
         goodsId: goodsId,
@@ -179,6 +171,14 @@ export class GiftGoodsController {
         giftCtrId: giftSendData.ctr_id,
       })
     ]);
+    await this.notificationRepository.create({
+      notificationSendUserId: currentUser.userId,
+      notificationReceiveUserId: otherUserId,
+      notificationMsg: userMeetingProfile?.meetingNickname + `님이 선물(${giftingInfo.goods_nm})을 보냈어요.`,
+      notificationType: NotificationType.SENT_GIFTING,
+      notificationServiceType: ServiceType.MEETING,
+      notificationDesc: giftHistoryInfo.id,
+    });
     await this.flowerHistoryRepository.create({
       flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + `님에게 상품 ${giftingInfo.goods_nm}을 선물함`,
       flowerValue: -giftingFlower, isFreeFlower: false,
@@ -190,7 +190,7 @@ export class GiftGoodsController {
       msg: userMeetingProfile?.meetingNickname + `님에게서 상품(${giftingInfo.goods_nm})을 받았습니다.`,
       icon: userMeetingProfile?.meetingPhotoMain,
     });
-    await this.notificationController.sendPushNotification(otherUserId, '선물을 받았습니다.', userMeetingProfile?.meetingNickname + `님에게서 상품(${giftingInfo.goods_nm})을 받았습니다.`);
+    await this.notificationController.sendPushNotification(otherUserId, '선물을 받았습니다.', userMeetingProfile?.meetingNickname + `님이 선물(${giftingInfo.goods_nm})을 보냈어요.`);
     return {payFlower: userInfo.payFlower - giftingFlower};
   }
 

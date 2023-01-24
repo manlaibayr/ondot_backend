@@ -1,5 +1,5 @@
 import {get, getModelSchemaRef, HttpErrors, param, patch, post, requestBody, response, Response, RestBindings} from '@loopback/rest';
-import {Count, Filter, repository} from '@loopback/repository';
+import {Count, Filter, NULL, repository} from '@loopback/repository';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
@@ -41,7 +41,7 @@ export class UserController {
     @repository(RolemappingRepository) private rolemappingRepository: RolemappingRepository,
     @repository(VerifytokenRepository) private verifytokenRepository: VerifytokenRepository,
     @repository(VerifyCodeRepository) private verifyCodeRepository: VerifyCodeRepository,
-    @repository(MeetingProfileRepository) private profileMeetingRepository: MeetingProfileRepository,
+    @repository(MeetingProfileRepository) private meetingProfileRepository: MeetingProfileRepository,
     @repository(HobbyProfileRepository) private hobbyProfileRepository: HobbyProfileRepository,
     @repository(LearningProfileRepository) private learningProfileRepository: LearningProfileRepository,
     @repository(PointSettingRepository) private pointSettingRepository: PointSettingRepository,
@@ -51,7 +51,6 @@ export class UserController {
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
-
 
   checkPassword(encrypt: string, plain: string): boolean {
     if (encrypt && plain) {
@@ -185,6 +184,11 @@ export class UserController {
         const refereePoint = refereePointInfo.pointSettingAmount;
         await this.userRepository.updateById(refereeUserInfo.id, {freeFlower: refereeUserInfo.freeFlower + refereePoint});
         await this.userRepository.updateById(userInfo.id, {freeFlower: userInfo.freeFlower + refereePoint});
+        const refereeLogInfo = await this.refereeLogRepository.create({
+          refereeLogUserId: userInfo.id,
+          refereeLogOtherUserId: refereeUserInfo.id,
+          refereeLogIdValue: signUpInfo.refereeEmail
+        });
         await this.flowerHistoryRepository.createAll([
           {
             flowerUserId: refereeUserInfo.id,
@@ -192,6 +196,7 @@ export class UserController {
             flowerValue: refereePoint,
             isFreeFlower: true,
             flowerHistoryType: FlowerHistoryType.REFEREE_GET,
+            flowerHistoryRefer: refereeLogInfo.id,
           },
           {
             flowerUserId: userInfo.id,
@@ -199,13 +204,9 @@ export class UserController {
             flowerValue: refereePoint,
             isFreeFlower: true,
             flowerHistoryType: FlowerHistoryType.REFEREE_GET,
+            flowerHistoryRefer: refereeLogInfo.id,
           },
         ]);
-        await this.refereeLogRepository.create({
-          refereeLogUserId: userInfo.id,
-          refereeLogOtherUserId: refereeUserInfo.id,
-          refereeLogIdValue: signUpInfo.refereeEmail
-        });
       }
     }
     await this.rolemappingRepository.create({user_id: userInfo.id, role_id: UserType.USER});
@@ -293,7 +294,7 @@ export class UserController {
   async getUserInfo() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     const userInfo = await this.userRepository.findById(currentUser.userId);
-    const profileMeeting = await this.profileMeetingRepository.findOne({where: {userId: currentUser.userId}});
+    const profileMeeting = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     const profileHobby = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
     const profileLearning = await this.learningProfileRepository.findOne({where: {userId: currentUser.userId}});
     const pointSettingList = await this.pointSettingRepository.find({fields: ['id', 'pointSettingAmount']});
@@ -307,6 +308,7 @@ export class UserController {
       freeFlower: userInfo.freeFlower,
       payFlower: userInfo.payFlower,
       userRefereeId: userInfo.userRefereeId,
+      refereeEmail: userInfo.refereeEmail,
       profile: {
         meeting: profileMeeting,
         hobby: profileHobby,
@@ -314,8 +316,8 @@ export class UserController {
       },
       pointSettingInfo,
       availableLearning: true,
-      availableGift: true,
-      availableCharge: true,
+      // availableGift: false,
+      // availableCharge: false,
     };
   }
 
@@ -380,6 +382,7 @@ export class UserController {
     let currentUser: UserCredentials | undefined;
     try {
       currentUser = await this.getCurrentUser() as UserCredentials;
+      await this.userRepository.updateAll({pushToken: ''}, {pushToken: data.pushToken});
       await this.userRepository.updateById(currentUser.userId, {pushToken: data.pushToken});
       // eslint-disable-next-line no-empty
     } catch (e) {
@@ -412,6 +415,51 @@ export class UserController {
   async userRemove() {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     await this.userRepository.updateById(currentUser.userId, {userStatus: UserStatusType.LEAVE});
+  }
+
+  @get('/users/apply-referee')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async applyReferee(
+    @param.query.string('code') code: string,
+  ) {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const userInfo: User = await this.userRepository.findById(currentUser.userId);
+    if(userInfo.refereeEmail) {
+      return {result: 'failed', msg: '이미 추천인을 입력했습니다.'};
+    }
+    const refereeUserInfo = await this.userRepository.findOne({where: {userRefereeId: code}});
+    if(!refereeUserInfo || refereeUserInfo.userRefereeId !== code) { // 대소문자구별
+      return {result: 'failed', msg: '추천인코드가 정확하지 않습니다.'};
+    }
+    await this.userRepository.updateById(currentUser.userId, {refereeEmail: code});
+    const refereeLogInfo = await this.refereeLogRepository.create({
+      refereeLogUserId: currentUser.userId,
+      refereeLogOtherUserId: refereeUserInfo.id,
+      refereeLogIdValue: code
+    });
+    const refereePointInfo = await this.pointSettingRepository.findById(PointSettingType.POINT_REFEREE);
+    const refereePoint = refereePointInfo.pointSettingAmount;
+    await this.userRepository.updateById(refereeUserInfo.id, {freeFlower: refereeUserInfo.freeFlower + refereePoint});
+    await this.userRepository.updateById(userInfo.id, {freeFlower: userInfo.freeFlower + refereePoint});
+    await this.flowerHistoryRepository.createAll([
+      {
+        flowerUserId: refereeUserInfo.id,
+        flowerContent: '추천인으로 부터 받음',
+        flowerValue: refereePoint,
+        isFreeFlower: true,
+        flowerHistoryType: FlowerHistoryType.REFEREE_GET,
+        flowerHistoryRefer: refereeLogInfo.id,
+      },
+      {
+        flowerUserId: userInfo.id,
+        flowerContent: '추천인을 제출하여 받음',
+        flowerValue: refereePoint,
+        isFreeFlower: true,
+        flowerHistoryType: FlowerHistoryType.REFEREE_GET,
+        flowerHistoryRefer: refereeLogInfo.id,
+      },
+    ]);
+    return {result: '성공', msg: refereePoint + '플라워를 받았습니다.'};
   }
 
 
@@ -506,4 +554,5 @@ export class UserController {
     }
     await this.userRepository.updateById(id, user);
   }
+
 }

@@ -5,6 +5,7 @@ import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
 import moment from 'moment';
 import axios from 'axios';
+import sharp from 'sharp';
 import {FILE_UPLOAD_SERVICE} from '../keys';
 import {ContactStatus, FileUploadHandler, FlowerHistoryType, PointSettingType, ServiceType, UserCredentials} from '../types';
 import {MeetingProfile} from '../models';
@@ -188,6 +189,9 @@ export class MeetingProfileController {
         }
       });
     });
+    for(const f of uploadFiles) {
+      await Utils.makeThumb(f.path);
+    }
     return uploadFiles.map((v) => v.urlPath).join(',');
   }
 
@@ -215,6 +219,7 @@ export class MeetingProfileController {
     data.meetingResidence = data.meetingResidence.split(' ').slice(0, 2).join(' ');
     data.isLike = !!likeInfo;
     data.isChat = !isAvailableContactReq;
+    if(data.isChat && meetingChatInfo) data.chatContactId = meetingChatInfo.id;
     data.isGiveRating = ratingCount.count > 0;
     data.isBlock = !!blockInfo;
     data.totalFavor = await this.rankingUserController.calcUserMeetingTotalFavor(otherProfile.userId);

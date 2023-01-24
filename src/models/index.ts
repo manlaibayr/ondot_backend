@@ -45,3 +45,5 @@ export * from './banner.model';
 export * from './hobby-category.model';
 export * from './learning-category.model';
 export * from './referee-log.model';
+export * from './event.model';
+export * from './event-comment.model';

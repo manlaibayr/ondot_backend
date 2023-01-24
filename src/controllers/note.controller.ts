@@ -66,7 +66,7 @@ export class NoteController {
         await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
         await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
           flowerUserId: currentUser.userId,
-          flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 쪽지를 보냈습니다.',
+          flowerContent: otherUserMeetingInfo?.meetingNickname + '님에게 쪽지를 보냈어요.',
           flowerValue: v.flowerValue,
           isFreeFlower: v.isFreeFlower,
           flowerHistoryType: FlowerHistoryType.SEND_NOTE,
@@ -95,7 +95,7 @@ export class NoteController {
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: data.otherId,
-      notificationMsg: nickname + '님에게 쪽지를 받았습니다.',
+      notificationMsg: nickname + '님이 쪽지를 보냈어요.',
       notificationType: NotificationType.NOTE,
       notificationServiceType: data.serviceType,
       notificationDesc: noteId,
@@ -103,7 +103,7 @@ export class NoteController {
     nspMain.to(data.otherId).emit(MainSocketMsgType.SRV_RECEIVE_NOTE, {
       userId: currentUser.userId, nickname: nickname, profile: profile, age: age, noteMsg: data.text, noteId: noteId,
     });
-    await this.notificationController.sendPushNotification(data.otherId, nickname + '님', data.text);
+    await this.notificationController.sendPushNotification(data.otherId, nickname + '님', nickname + '님이 쪽지를 보냈어요.');
   }
 
   @post('/notes/{id}/answer')
@@ -120,7 +120,7 @@ export class NoteController {
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: noteInfo.noteUserId,
-      notificationMsg: meMeetingInfo?.meetingNickname + '님에게 답변쪽지를 받으셨습니다.',
+      notificationMsg: meMeetingInfo?.meetingNickname + '님이 답변을 보냈어요.',
       notificationType: NotificationType.NOTE_ANSWER,
       notificationServiceType: ServiceType.MEETING,
       notificationDesc: noteInfo.id,
@@ -129,6 +129,6 @@ export class NoteController {
     nspMain.to(noteInfo.noteUserId).emit(MainSocketMsgType.SRV_RECEIVE_NOTE, {
       userId: currentUser.userId, nickname: meMeetingInfo?.meetingNickname, profile: meMeetingInfo?.meetingPhotoMain, age: meMeetingInfo?.age, noteMsg: data.text, noteAnswerMsg: data.text,
     });
-    await this.notificationController.sendPushNotification(noteInfo.noteUserId, meMeetingInfo?.meetingNickname + '님', data.text);
+    await this.notificationController.sendPushNotification(noteInfo.noteUserId, meMeetingInfo?.meetingNickname + '님', meMeetingInfo?.meetingNickname + '님이 답변을 보냈어요.');
   }
 }

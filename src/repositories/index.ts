@@ -45,3 +45,5 @@ export * from './banner.repository';
 export * from './hobby-category.repository';
 export * from './learning-category.repository';
 export * from './referee-log.repository';
+export * from './event.repository';
+export * from './event-comment.repository';

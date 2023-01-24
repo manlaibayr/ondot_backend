@@ -15,9 +15,8 @@ export class Notification extends Entity {
 
   @property({
     type: 'string',
-    required: true,
   })
-  notificationSendUserId: string;
+  notificationSendUserId?: string;
 
   @property({
     type: 'string',

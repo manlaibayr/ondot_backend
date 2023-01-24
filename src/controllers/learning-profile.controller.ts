@@ -280,6 +280,9 @@ export class LearningProfileController {
         }
       });
     });
+    for(const f of uploadFiles) {
+      await Utils.makeThumb(f.path);
+    }
     return uploadFiles.map((v) => v.urlPath).join(',');
   }
 
@@ -351,10 +354,23 @@ export class LearningProfileController {
     @param.query.string('id') teacherId: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    const targetProfile = await this.learningProfileRepository.findById(teacherId);
-    const dibsInfo = await this.learningDibsRepository.findOne({where: {dibsUserId: currentUser.userId, dibsTargetUserId: targetProfile.userId}});
+    const targetLearningProfile = await this.learningProfileRepository.findById(teacherId);
+    const dibsInfo = await this.learningDibsRepository.findOne({where: {dibsUserId: currentUser.userId, dibsTargetUserId: targetLearningProfile.userId}});
     if (!dibsInfo) {
-      await this.learningDibsRepository.create({dibsUserId: currentUser.userId, dibsTargetUserId: targetProfile.userId});
+      const newDibsInfo = await this.learningDibsRepository.create({dibsUserId: currentUser.userId, dibsTargetUserId: targetLearningProfile.userId});
+      const myLearningProfile = await this.learningProfileRepository.findOne({where: {userId: currentUser.userId}});
+      const msg = targetLearningProfile.learningProfileType === LearningProfileType.TEACHER ?
+        `${myLearningProfile?.learningNickname}학생이 ${targetLearningProfile.learningNickname}선생님을 찜했어요.` :
+        `${myLearningProfile?.learningNickname}선생님이 ${targetLearningProfile.learningNickname}학생을 찜했어요.`;
+      await this.notificationRepository.create({
+        notificationSendUserId: currentUser.userId,
+        notificationReceiveUserId: targetLearningProfile.userId,
+        notificationMsg: msg,
+        notificationType: NotificationType.LEARNING_DIBS,
+        notificationServiceType: ServiceType.LEARNING,
+        notificationDesc: newDibsInfo.id,
+      });
+      await this.notificationController.sendPushNotification(targetLearningProfile.userId, myLearningProfile?.learningNickname + '님', msg);
     } else {
       await this.learningDibsRepository.deleteById(dibsInfo.id);
     }
@@ -426,11 +442,11 @@ export class LearningProfileController {
         contactServiceType: ServiceType.LEARNING,
       });
     }
-
+    const notificationMsg = myLearningInfo?.learningNickname + (myLearningInfo?.learningProfileType === LearningProfileType.TEACHER ? '선생님': '학생') + '이 대화신청을 했어요.';
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: userId,
-      notificationMsg: myLearningInfo?.learningNickname + '님이 대화신청을 보냈습니다.',
+      notificationMsg: notificationMsg,
       notificationType: NotificationType.CHAT_REQUEST,
       notificationServiceType: ServiceType.LEARNING,
     });
@@ -442,7 +458,7 @@ export class LearningProfileController {
       contactId: chatContactInfo.id,
       chatType: ChatType.LEARNING_CHAT,
     });
-    await this.notificationController.sendPushNotification(userId, myLearningInfo?.learningNickname + '님', myLearningInfo?.learningNickname + '님이 대화신청을 보냈습니다.');
+    await this.notificationController.sendPushNotification(userId, myLearningInfo?.learningNickname + '님', notificationMsg);
   }
 
 }

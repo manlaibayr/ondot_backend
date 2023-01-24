@@ -155,6 +155,9 @@ export class HobbyProfileController {
         }
       });
     });
+    for(const f of uploadFiles) {
+      await Utils.makeThumb(f.path);
+    }
     return uploadFiles.map((v) => v.urlPath).join(',');
   }
 

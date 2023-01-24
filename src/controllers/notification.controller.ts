@@ -1,15 +1,16 @@
 import {repository} from '@loopback/repository';
-import {MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
+import {ChatContactRepository, ChatMsgRepository, MeetingProfileRepository, NotificationRepository, UserRepository} from '../repositories';
 import {del, get, HttpErrors, param} from '@loopback/rest';
 import {secured, SecuredType} from '../role-authentication';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
-import {ServiceType, UserCredentials} from '../types';
+import {ChatMsgStatus, ContactStatus, ServiceType, UserCredentials} from '../types';
 import {NotificationWithRelations} from '../models';
 import {LearningProfileController} from './learning-profile.controller';
 import * as firebaseAdmin from 'firebase-admin';
 import {CONFIG} from '../config';
+import {ChatController} from './chat.controller';
 
 /**
  * firebase admin init
@@ -18,16 +19,26 @@ firebaseAdmin.initializeApp({credential: firebaseAdmin.credential.cert(CONFIG.fi
 
 export class NotificationController {
   constructor(
-    @repository(UserRepository) private userRepository: UserRepository,
     @repository(NotificationRepository) public notificationRepository: NotificationRepository,
     @repository(MeetingProfileRepository) public meetingProfileRepository: MeetingProfileRepository,
+    @repository(UserRepository) public userRepository: UserRepository,
+    @repository(ChatContactRepository) public chatContactRepository: ChatContactRepository,
+    @repository(ChatMsgRepository) public chatMsgRepository: ChatMsgRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
 
   public async sendPushNotification(userId: string, title: string, body: string) {
+    const contactListResult = await this.chatContactRepository.find({
+      where: {or: [{contactUserId: userId, contactStatus: {neq: ContactStatus.DELETE}}, {contactOtherUserId: userId, contactOtherStatus: {neq: ContactStatus.DELETE}}]},
+    });
+    const contactIds = contactListResult.map((v) => v.id);
+    const chatCount = await this.chatMsgRepository.count({chatContactId: {inq: contactIds}, receiverUserId: userId, msgReceiverStatus: ChatMsgStatus.UNREAD});
+
+    const unShowNotificationCount = await this.notificationRepository.count({notificationReceiveUserId: userId, notificationShow: false, notificationDelete: false});
+    const badgeCount = chatCount.count + unShowNotificationCount.count;
     const userInfo = await this.userRepository.findById(userId, {fields: ['pushToken']});
-    if(userInfo.pushToken) firebaseAdmin.messaging().sendToDevice(userInfo.pushToken , {notification: {title: title, body: body}}).then(() => null);
+    if(userInfo.pushToken) firebaseAdmin.messaging().sendToDevice(userInfo.pushToken , {notification: {title: title, body: body, badge: badgeCount.toString()}}).then(() => null).catch(() => null);
   }
 
 
@@ -88,7 +99,7 @@ export class NotificationController {
         profile: v.senderHobbyProfile?.hobbyPhoto,
       })
     );
-    return { meeting, learning, hobby};
+    return { meeting, learning, hobby, common: []};
   }
 
   @get('/notifications/{id}/show')

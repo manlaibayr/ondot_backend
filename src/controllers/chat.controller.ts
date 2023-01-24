@@ -11,9 +11,11 @@ import {
   ChatMsgRepository,
   HobbyProfileRepository,
   HobbyRoomMemberRepository,
-  HobbyRoomRepository, LearningProfileRepository,
+  HobbyRoomRepository,
+  LearningProfileRepository,
   MeetingProfileRepository,
   NotificationRepository,
+  UserRepository,
 } from '../repositories';
 import {ChatMsgStatus, ChatMsgType, ChatSocketMsgType, ChatType, ContactStatus, FileUploadHandler, MainSocketMsgType, RoomMemberJoinType, ServiceType, UserCredentials} from '../types';
 import {ws} from '../websockets/decorators/websocket.decorator';
@@ -23,6 +25,7 @@ import moment from 'moment';
 import {Utils} from '../utils';
 import {FILE_UPLOAD_SERVICE} from '../keys';
 import {LearningProfileController} from './learning-profile.controller';
+import {NotificationController} from './notification.controller';
 
 export class ChatController {
   constructor(
@@ -36,10 +39,22 @@ export class ChatController {
     @repository(HobbyRoomMemberRepository) public hobbyRoomMemberRepository: HobbyRoomMemberRepository,
     @repository(ChatGroupMsgRepository) public chatGroupMsgRepository: ChatGroupMsgRepository,
     @repository(BlockUserRepository) public blockUserRepository: BlockUserRepository,
+    @repository(UserRepository) public userRepository: UserRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
     @inject(FILE_UPLOAD_SERVICE) private fileUploadHandler: FileUploadHandler,
   ) {
   }
+
+  getContactStatusStr = (isSelf: boolean, info: ChatContact) => {
+    const status: ContactStatus = isSelf ? info.contactStatus : info.contactOtherStatus;
+    const otherUserStatus: ContactStatus = !isSelf ? info.contactStatus : info.contactOtherStatus;
+    if (status === ContactStatus.ALLOW) {
+      return otherUserStatus === ContactStatus.DELETE ? '채팅종료' : null;
+    } else {
+      return status;
+    }
+  };
 
   @get('/chats/contact-change')
   @secured(SecuredType.IS_AUTHENTICATED)
@@ -61,9 +76,10 @@ export class ChatController {
         callUserName: myMeetingInfo?.meetingNickname,
         callUserProfile: myMeetingInfo?.meetingPhotoMain,
         contactId: chatContactId,
-        chatType: ChatType.MEETING_CHAT
+        chatType: ChatType.MEETING_CHAT,
       });
       nspChat.to(chatContactId).emit(ChatSocketMsgType.SRV_CONTACT_CHANGE, {});
+      await this.notificationController.sendPushNotification(otherUserId, myMeetingInfo?.meetingNickname + '님', myMeetingInfo?.meetingNickname + '님이 대화를 수락했어요.');
     } else if (type === 'reject') {
       await this.chatContactRepository.updateById(chatContactId, {
         contactStatus: contactInfo.contactUserId === currentUser.userId ? ContactStatus.REJECT : ContactStatus.REJECTED,
@@ -92,21 +108,12 @@ export class ChatController {
     const contactListResult = await this.chatContactRepository.find({
       where: {or: [{contactUserId: currentUser.userId, contactStatus: {neq: ContactStatus.DELETE}}, {contactOtherUserId: currentUser.userId, contactOtherStatus: {neq: ContactStatus.DELETE}}]},
     });
-    const getStatusStr = (isSelf: boolean, info: ChatContact) => {
-      const status: ContactStatus = isSelf ? info.contactStatus : info.contactOtherStatus;
-      const otherUserStatus: ContactStatus = !isSelf ? info.contactStatus : info.contactOtherStatus;
-      if (status === ContactStatus.ALLOW) {
-        return otherUserStatus === ContactStatus.DELETE ? '채팅종료' : null;
-      } else {
-        return status;
-      }
-    };
 
     const contactList = contactListResult.map((v) => ({
       id: v.id,
       otherUserId: v.contactUserId !== currentUser.userId ? v.contactUserId : v.contactOtherUserId,
       status: v.contactStatus,
-      statusStr: getStatusStr(v.contactUserId === currentUser.userId, v),
+      statusStr: this.getContactStatusStr(v.contactUserId === currentUser.userId, v),
       contactServiceType: v.contactServiceType,
       createdAt: v.createdAt,
     }));
@@ -210,6 +217,21 @@ export class ChatController {
         }
       });
     });
+    for(const f of uploadFiles) {
+      await Utils.makeThumb(f.path);
+    }
     return uploadFiles.map((v) => v.urlPath).join(',');
+  }
+
+  @get('/chats/unread-count')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async unreadCount() {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const contactListResult = await this.chatContactRepository.find({
+      where: {or: [{contactUserId: currentUser.userId, contactStatus: {neq: ContactStatus.DELETE}}, {contactOtherUserId: currentUser.userId, contactOtherStatus: {neq: ContactStatus.DELETE}}]},
+    });
+    const contactIds = contactListResult.map((v) => v.id);
+    const chatCount = await this.chatMsgRepository.count({chatContactId: {inq: contactIds}, receiverUserId: currentUser.userId, msgReceiverStatus: ChatMsgStatus.UNREAD});
+    return chatCount.count;
   }
 }

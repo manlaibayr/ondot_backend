@@ -10,6 +10,7 @@ import {ws} from '../websockets/decorators/websocket.decorator';
 import {Namespace} from 'socket.io';
 import {FlowerController} from './flower.controller';
 import {Utils} from '../utils';
+import {NotificationController} from './notification.controller';
 
 export class LikeController {
   constructor(
@@ -19,7 +20,8 @@ export class LikeController {
     @repository(FlowerHistoryRepository) public flowerHistoryRepository: FlowerHistoryRepository,
     @repository(PointSettingRepository) public pointSettingRepository: PointSettingRepository,
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
-    @inject(`controllers.FlowerController`) private flowerController: FlowerController
+    @inject(`controllers.FlowerController`) private flowerController: FlowerController,
+    @inject(`controllers.NotificationController`) private notificationController: NotificationController,
   ) {
   }
 
@@ -50,6 +52,8 @@ export class LikeController {
       likeOtherUserId: otherUserId,
       likeServiceType: ServiceType.MEETING,
     });
+    const myMeetingInfo = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
+    await this.notificationController.sendPushNotification(otherUserId, myMeetingInfo?.meetingNickname + '님', myMeetingInfo?.meetingNickname + '님이 좋아요를 눌렀어요')
     if(!hasMeetingPass) {
       const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, likeFlower);
       await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});

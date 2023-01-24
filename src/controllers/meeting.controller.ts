@@ -181,7 +181,7 @@ export class MeetingController {
     await this.notificationRepository.create({
       notificationSendUserId: currentUser.userId,
       notificationReceiveUserId: userId,
-      notificationMsg: myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.',
+      notificationMsg: myMeetingInfo?.meetingNickname + '님이 대화를 신청했어요',
       notificationType: NotificationType.CHAT_REQUEST,
       notificationServiceType: ServiceType.MEETING,
     });
@@ -193,6 +193,6 @@ export class MeetingController {
       contactId: chatContactInfo.id,
       chatType: ChatType.MEETING_CHAT
     });
-    await this.notificationController.sendPushNotification(userId, myMeetingInfo?.meetingNickname + '님', myMeetingInfo?.meetingNickname + '님이 대화신청을 보냈습니다.');
+    await this.notificationController.sendPushNotification(userId, myMeetingInfo?.meetingNickname + '님', myMeetingInfo?.meetingNickname + '님이 대화를 신청했어요');
   }
 }
