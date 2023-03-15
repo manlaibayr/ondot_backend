@@ -423,6 +423,7 @@ export class LearningProfileController {
     @param.query.string('userId') userId: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    if(userId === currentUser.userId) throw new HttpErrors.BadRequest('불가능한 요청입니다.');
     const myLearningInfo = await this.learningProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserLearningInfo = await this.learningProfileRepository.findOne({where: {userId: userId}});
     let chatContactInfo = await this.chatContactRepository.findOne({

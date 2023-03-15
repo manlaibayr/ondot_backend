@@ -83,7 +83,7 @@ export class BlockController {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     await this.blockPhoneRepository.deleteAll({blockPhoneUserId: currentUser.userId});
     await this.blockPhoneRepository.createAll(data.phoneList.map((v) => ({
-      blockPhoneUserId: currentUser.userId, blockPhoneName: v.name, blockPhoneNum: v.phone, blockPhoneServiceType: ServiceType.MEETING,
+      blockPhoneUserId: currentUser.userId, blockPhoneName: v.name, blockPhoneNum: v.phone.replace(/-/g, ''), blockPhoneServiceType: ServiceType.MEETING,
     })));
   }
 

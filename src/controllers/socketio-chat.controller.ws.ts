@@ -318,14 +318,14 @@ export class ChatControllerWs {
       this.socket.emit(ChatSocketMsgType.SRV_VOICE_CALL_START, {error: '상대방이 입장하지 않았습니다.'});
     } else {
       this.socket.emit(ChatSocketMsgType.SRV_VOICE_CALL_START, {error: null});
-      nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_VOICE_REQ, {
-        chatContactId: this.chatContactId,
-        profile: {
-          profile: this.meInfo.profile,
-          id: this.meInfo.id,
-          nickname: this.meInfo.nickname,
-        },
-      });
+      // nspMain.to(this.otherInfo.id).emit(MainSocketMsgType.SRV_OTHER_VOICE_REQ, {
+      //   chatContactId: this.chatContactId,
+      //   profile: {
+      //     profile: this.meInfo.profile,
+      //     id: this.meInfo.id,
+      //     nickname: this.meInfo.nickname,
+      //   },
+      // });
     }
   }
 

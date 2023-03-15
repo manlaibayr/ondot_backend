@@ -9,6 +9,7 @@ import {ChargeHistoryRepository, FlowerHistoryRepository, NotificationRepository
 import {ChargeStatus, FlowerHistoryType, UserCredentials} from '../types';
 import {secured, SecuredType} from '../role-authentication';
 import {CONFIG} from '../config';
+const iap = require('iap');
 
 export class ChargeHistoryController {
   constructor(
@@ -20,6 +21,74 @@ export class ChargeHistoryController {
     @inject.getter(AuthenticationBindings.CURRENT_USER) readonly getCurrentUser: Getter<UserProfile>,
   ) {
   }
+
+  @post('/charge-histories/iap-charge')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async iapCharge(
+    @requestBody() data: {
+      platform: ('ios' | 'android'), productId: string, transactionDate: number, transactionId: string, transactionReceipt: string,
+      amount: number, currency: string
+    },
+  ) {
+    const verifyPayment = (platformParma: string, paymentParam: any) => {
+      return new Promise((resolve, reject) => {
+        iap.verifyPayment(platformParma, paymentParam, function (error: any, resp: any) {
+          if(error) {
+            console.log('iap verify error', error);
+            reject(error);
+          } else {
+            resolve(resp);
+          }
+        });
+      })
+    }
+
+    const productList: any = {
+      flower_200: {flower: 200},
+      flower_500: {flower: 500},
+      flower_1000: {flower: 1000},
+      flower_5000: {flower: 5000},
+      flower_10000: {flower: 10000},
+    }
+
+    const payment = {
+      productId: data.productId,
+      receipt: data.transactionReceipt, // always required
+      packageName: 'com.ontec.ondot',
+      // secret: 'password',
+      subscription: false,	// optional, if google play subscription
+      keyObject: {}, // required, if google
+    };
+    const resp: any | undefined = await verifyPayment(data.platform === 'ios' ? 'apple' : 'google', payment);
+    if(resp?.receipt) {
+      const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+      const chargeFlower: number = productList[data.productId].flower;
+
+      await this.userRepository.updateById(currentUser.userId, {payFlower: currentUser.payFlower + chargeFlower});
+      const chargeHistoryInfo = await this.chargeHistoryRepository.create({
+        chargeUserId: currentUser.userId,
+        chargeProductId: resp.productId,
+        chargePlatform: data.platform,
+        chargeTransactionId: resp.receipt?.in_app[0]?.transaction_id,
+        chargeAmount: data.amount,
+        chargeCurrency: data.currency,
+        chargeFlower: chargeFlower,
+        chargeDesc: `플라워 ${chargeFlower}송이 구매`,
+        chargeStatus: ChargeStatus.SUCCESS
+      });
+      await this.flowerHistoryRepository.create({
+        flowerUserId: currentUser.userId,
+        flowerContent: `${chargeFlower} 충전`,
+        flowerValue: chargeFlower,
+        isFreeFlower: false,
+        flowerHistoryType: FlowerHistoryType.FLOWER_CHARGE,
+        flowerHistoryRefer: chargeHistoryInfo.id,
+      });
+      return {flower: chargeFlower};
+    }
+    console.log(JSON.stringify(resp), 'iap response');
+  }
+
 
   @post('/charge-histories')
   @secured(SecuredType.IS_AUTHENTICATED)

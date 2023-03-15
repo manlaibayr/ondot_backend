@@ -142,6 +142,16 @@ export class MeetingProfile extends Entity {
   @property({
     type: 'number',
   })
+  meetingOtherResidenceLat?: number;
+
+  @property({
+    type: 'number',
+  })
+  meetingOtherResidenceLng?: number;
+
+  @property({
+    type: 'number',
+  })
   meetingOtherStartHeight?: number;
 
   @property({

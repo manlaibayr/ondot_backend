@@ -18,21 +18,18 @@ export class ChargeHistory extends Entity {
 
   @property({
     type: 'string',
-    required: true,
   })
-  impUid: string;
+  chargeProductId: string;
 
   @property({
     type: 'string',
-    required: true,
   })
-  merchantUid: string;
+  chargePlatform: string;
 
   @property({
     type: 'string',
-    required: true,
   })
-  chargeMethod: string;
+  chargeTransactionId: string;
 
   @property({
     type: 'number',
@@ -41,9 +38,49 @@ export class ChargeHistory extends Entity {
   chargeAmount: number;
 
   @property({
+    type: 'string',
+  })
+  chargeCurrency: string;
+
+  @property({
     type: 'number',
   })
   chargeFlower: number;
+
+  @property({
+    type: 'string',
+    jsonSchema: {
+      enum: Object.values(ChargeStatus)
+    }
+  })
+  chargeStatus?: ChargeStatus;
+
+  @property({
+    type: 'date',
+  })
+  updatedAt?: Date;
+
+  @property({
+    type: 'date',
+    default: "$now"
+  })
+  createdAt?: Date;
+
+// these fields does not need now
+  @property({
+    type: 'string',
+  })
+  impUid: string;
+
+  @property({
+    type: 'string',
+  })
+  merchantUid: string;
+
+  @property({
+    type: 'string',
+  })
+  chargeMethod: string;
 
   @property({
     type: 'string',
@@ -69,25 +106,6 @@ export class ChargeHistory extends Entity {
     type: 'string',
   })
   chargeApplyNum?: string;
-
-  @property({
-    type: 'string',
-    jsonSchema: {
-      enum: Object.values(ChargeStatus)
-    }
-  })
-  chargeStatus?: ChargeStatus;
-
-  @property({
-    type: 'date',
-  })
-  updatedAt?: Date;
-
-  @property({
-    type: 'date',
-    default: "$now"
-  })
-  createdAt?: Date;
 
 
   constructor(data?: Partial<ChargeHistory>) {

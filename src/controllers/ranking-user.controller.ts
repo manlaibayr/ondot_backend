@@ -218,10 +218,10 @@ export class RankingUserController {
     for (const u of userList) {
       // 누적지수 계산
       try {
-        const meetingFavor = await this.calcUserMeetingMonthFavor(u.id, moment('2022-01-01').toDate(), moment().toDate());
-        const learningFavor = await this.calcUserLearningMonthFavor(u.id, moment('2022-01-01').toDate(), moment().toDate());
-        await this.meetingProfileRepository.updateAll({meetingRanking: meetingFavor?.sumFavor || 0}, {userId: u.id});
-        await this.learningProfileRepository.updateAll({learningRanking: learningFavor?.sum || 0}, {userId: u.id});
+        const meetingFavor = await this.calcUserMeetingMonthFavor(u.id, moment().subtract(30, 'days').toDate(), moment().toDate());
+        const learningFavor = await this.calcUserLearningMonthFavor(u.id, moment().subtract(30, 'days').toDate(), moment().toDate());
+        await this.meetingProfileRepository.updateAll({meetingRanking: meetingFavor?.sumFavor ?? 0}, {userId: u.id});
+        await this.learningProfileRepository.updateAll({learningRanking: learningFavor?.sum ?? 0}, {userId: u.id});
       } catch (e) {}
     }
   }

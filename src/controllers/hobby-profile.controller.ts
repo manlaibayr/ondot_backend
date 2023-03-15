@@ -168,6 +168,7 @@ export class HobbyProfileController {
     @param.query.string('userId') userId: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    if(userId === currentUser.userId) throw new HttpErrors.BadRequest('불가능한 요청입니다.');
 
     const myHobbyInfo = await this.hobbyProfileRepository.findOne({where: {userId: currentUser.userId}});
     const otherUserHobbyInfo = await this.hobbyProfileRepository.findOne({where: {userId: userId}});

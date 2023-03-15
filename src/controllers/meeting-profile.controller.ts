@@ -48,7 +48,7 @@ export class MeetingProfileController {
   ) {
   }
 
-  async getCoordinates(address: string) {
+  public static async getCoordinates(address: string) {
     const url = 'https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(address);
     axios.defaults.withCredentials = false;
     axios.defaults.headers.common['Authorization'] = 'KakaoAK ' + 'xxxxxxxxxxxxxxxxxxxxxxx';
@@ -83,6 +83,7 @@ export class MeetingProfileController {
     const profile = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     if (!profile) throw new HttpErrors.BadRequest('미팅 프로파일을 설정해야 합니다.');
     const data: any = profile.toJSON();
+    data.meetingResidence = data.meetingResidence.split(' ').slice(0, 2).join(' ');
     data.likeCount = likeCount.count;
     data.visitCount = visitCount.count;
     data.totalFavor = await this.rankingUserController.calcUserMeetingTotalFavor(currentUser.userId);
@@ -141,9 +142,14 @@ export class MeetingProfileController {
       freeFlower += additionalFlower;
     }
     if(meetingProfile.meetingResidence) {
-      const {lat, lng} = await this.getCoordinates(meetingProfile.meetingResidence);
+      const {lat, lng} = await MeetingProfileController.getCoordinates(meetingProfile.meetingResidence);
       meetingProfile.meetingResidenceLat = lat;
       meetingProfile.meetingResidenceLng = lng;
+    }
+    if(meetingProfile.meetingOtherResidence) {
+      const otherCord = await MeetingProfileController.getCoordinates(meetingProfile.meetingOtherResidence);
+      meetingProfile.meetingOtherResidenceLat = otherCord.lat;
+      meetingProfile.meetingOtherResidenceLng = otherCord.lng;
     }
     const profileResult = await this.meetingProfileRepository.create(meetingProfile);
     await this.userRepository.updateById(currentUser.userId, {meetingProfileId: profileResult.id, freeFlower});
@@ -166,9 +172,14 @@ export class MeetingProfileController {
       meetingProfile: Omit<MeetingProfile, 'id' | 'age' | 'sex'>,
   ): Promise<Count> {
     if(meetingProfile.meetingResidence) {
-      const {lat, lng} = await this.getCoordinates(meetingProfile.meetingResidence);
+      const {lat, lng} = await MeetingProfileController.getCoordinates(meetingProfile.meetingResidence);
       meetingProfile.meetingResidenceLat = lat;
       meetingProfile.meetingResidenceLng = lng;
+    }
+    if(meetingProfile.meetingOtherResidence) {
+      const otherCord = await MeetingProfileController.getCoordinates(meetingProfile.meetingOtherResidence);
+      meetingProfile.meetingOtherResidenceLat = otherCord.lat;
+      meetingProfile.meetingOtherResidenceLng = otherCord.lng;
     }
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
     return this.meetingProfileRepository.updateAll(meetingProfile, {userId: currentUser.userId});

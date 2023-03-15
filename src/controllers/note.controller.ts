@@ -45,6 +45,7 @@ export class NoteController {
     @ws.namespace('main') nspMain: Namespace,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    if(data.otherId === currentUser.userId) throw new HttpErrors.BadRequest('불가능한 요청입니다.');
     let nickname: string | undefined , noteId: string | undefined, profile: string | undefined, age: number | undefined;
     if (data.serviceType === ServiceType.MEETING) {
       const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_MEETING_NOTE);

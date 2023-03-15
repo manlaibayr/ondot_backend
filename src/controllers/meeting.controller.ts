@@ -1,4 +1,4 @@
-import {repository} from '@loopback/repository';
+import {Filter, repository} from '@loopback/repository';
 import {Getter, inject} from '@loopback/core';
 import {AuthenticationBindings} from '@loopback/authentication';
 import {UserProfile} from '@loopback/security';
@@ -11,6 +11,8 @@ import {ws} from '../websockets/decorators/websocket.decorator';
 import {FlowerController} from './flower.controller';
 import {Utils} from '../utils';
 import {NotificationController} from './notification.controller';
+import {MeetingProfile, User} from '../models';
+import {MeetingProfileController} from './meeting-profile.controller';
 
 export class MeetingController {
   constructor(
@@ -32,23 +34,23 @@ export class MeetingController {
     otherProfile: any,
   ): number {
     const keys = [
-      {myStartKey: 'meetingOtherStartAge', myEndKey: 'meetingOtherEndAge', otherKey: 'age'},
-      {myKey: 'meetingOtherResidence', otherKey: 'meetingResidence'},
+      // {myStartKey: 'meetingOtherStartAge', myEndKey: 'meetingOtherEndAge', otherKey: 'age'},
+      // {myKey: 'meetingOtherResidence', otherKey: 'meetingResidence'},
       {myKey: 'meetingOtherMeeting', otherKey: 'meetingMeeting'},
       {myKey: 'meetingOtherBodyType', otherKey: 'meetingBodyType'},
       {myStartKey: 'meetingOtherStartHeight', myEndKey: 'meetingOtherEndHeight', otherKey: 'meetingHeight'},
-      {myKey: 'meetingOtherSex', otherKey: 'sex'},
+      // {myKey: 'meetingOtherSex', otherKey: 'sex'},
       {myKey: 'meetingOtherPersonality', otherKey: 'meetingPersonality'},
       {myKey: 'meetingOtherSmoking', otherKey: 'meetingSmoking'},
-    ]
+    ];
     let matchCount = 0;
     keys.forEach((v: any) => {
-      if(v.myKey && v.myKey.indexOf('Residence') !== -1) {
-        if(otherProfile[v.otherKey].indexOf(myProfile[v.myKey])) matchCount++;
-      } else if(v.myKey) {
-        if(myProfile[v.myKey] === otherProfile[v.otherKey]) matchCount++;
+      if (v.myKey && v.myKey.indexOf('Residence') !== -1) {
+        if (otherProfile[v.otherKey].indexOf(myProfile[v.myKey])) matchCount++;
+      } else if (v.myKey) {
+        if (myProfile[v.myKey] === otherProfile[v.otherKey]) matchCount++;
       } else if (v.myStartKey && v.myEndKey) {
-        if(myProfile[v.myStartKey] <= otherProfile[v.otherKey] && myProfile[v.myEndKey] >= otherProfile[v.otherKey]) matchCount++;
+        if (myProfile[v.myStartKey] <= otherProfile[v.otherKey] && myProfile[v.myEndKey] >= otherProfile[v.otherKey]) matchCount++;
       }
     });
     return matchCount;
@@ -58,7 +60,7 @@ export class MeetingController {
     myProfile: any,
     otherProfile: any,
   ): number {
-    if(!myProfile.meetingResidenceLat || !myProfile.meetingResidenceLng || !otherProfile.meetingResidenceLat || !otherProfile.meetingResidenceLng) return 999999;
+    if (!myProfile.meetingResidenceLat || !myProfile.meetingResidenceLng || !otherProfile.meetingResidenceLat || !otherProfile.meetingResidenceLng) return 999999;
     const toRad = (value: number) => {
       return value * Math.PI / 180;
     };
@@ -67,9 +69,9 @@ export class MeetingController {
     const dLon = toRad(otherProfile.meetingResidenceLng - myProfile.meetingResidenceLng);
     const lat1 = toRad(myProfile.meetingResidenceLat);
     const lat2 = toRad(otherProfile.meetingResidenceLat);
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
 
@@ -77,48 +79,104 @@ export class MeetingController {
   @secured(SecuredType.IS_AUTHENTICATED)
   async meetingMain(
     @ws.namespace('main') nspMain: Namespace,
+    @param.query.string('listType') listType?: string,
+    @param.query.number('page') page?: number,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const userProfile: User = await this.userRepository.findById(currentUser.userId, {fields: ['phoneNumber']});
     const myProfile = await this.meetingProfileRepository.findOne({where: {userId: currentUser.userId}});
     // 지인차단
     const blockPhones = await this.blockPhoneRepository.find({where: {blockPhoneUserId: currentUser.userId}});
+    const blockedPhones = await this.blockPhoneRepository.find({where: {blockPhoneName: {like: '%' + userProfile.phoneNumber}}});
     const blockUsers = await this.userRepository.find({where: {phoneNumber: {inq: blockPhones.map((v) => v.blockPhoneNum)}}});
-    const blokcIds = blockUsers.map((v) => v.id);
-    blokcIds.push(currentUser.userId);
-    let profileList: any[] = await this.meetingProfileRepository.find({where: {userId: {nin: blokcIds}}, order: ['meetingRanking desc']});
-
-    // 접속한 회원 리스트
+    const blockIds = blockUsers.map((v) => v.id).concat(blockedPhones.map((v) => v.blockPhoneUserId));
+    blockIds.push(currentUser.userId);
+    const blockIdsStr = blockIds.length === 0 ? '' : "'" + blockIds.join("','") + "'";
     const rooms: any = nspMain.adapter.rooms;
     const onlineUserIds = Object.keys(rooms).filter((v) => v[0] !== '/');
-    profileList = profileList.map((v: any) => ({
-      ...v,
-      isOnline: onlineUserIds.indexOf(v.userId) !== -1
-    }));
+    const countPerPage = 15;
+    const startNum = page ? (page - 1) * countPerPage : 0;
+    const endNum = page ? page * countPerPage : countPerPage;
 
+    const filter: Filter<MeetingProfile> = {
+      skip: startNum,
+      limit: countPerPage,
+      order: ['meetingRanking desc']
+    };
+    filter.where = {userId: {nin: blockIds}};
+
+    let popularList, nearList, matchList
     //인기순
-    const popularList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v)));
+    if(listType === 'main' || listType === 'popularList') {
+      const popularListResult = await this.meetingProfileRepository.find(filter);
+      popularList = popularListResult.map((v: any) => ({
+        ...v,
+        isOnline: onlineUserIds.indexOf(v.userId) !== -1,
+      }));
+      if (listType === 'popularList') return popularList;
+    }
 
     // 거리순
-    profileList.sort((a: any, b: any) => {
-      return (this.getDistance(myProfile, a) - this.getDistance(myProfile, b));
-    });
-    const nearList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v)));
+    if(listType === 'main' || listType === 'nearList') {
+      const query = `SELECT *, (6371*acos(cos(radians(${myProfile?.meetingResidenceLat}))*cos(radians(meetingResidenceLat))*cos(radians(meetingResidenceLng)-radians(${myProfile?.meetingResidenceLng}))+sin(radians(${myProfile?.meetingResidenceLat}))*sin(radians( meetingResidenceLat)))) AS distance ` +
+        `FROM meeting_profile WHERE userId NOT IN (${blockIdsStr}) ORDER BY distance ASC LIMIT ${startNum}, ${countPerPage}`;
+      const nearListResult = await this.meetingProfileRepository.execute(query);
+      nearList = nearListResult.map((v: any) => ({
+        ...v,
+        isOnline: onlineUserIds.indexOf(v.userId) !== -1,
+      }));
+      if (listType === 'nearList') return nearList;
+    }
 
-    // 매칭순
-    profileList.sort((a: any, b: any) => {
-      return (this.getMeetingMatchCount(myProfile, b) - this.getMeetingMatchCount(myProfile, a));
-    });
-    const matchList = profileList.slice(0, 15).map((v) => JSON.parse(JSON.stringify(v)));
+    // 매칭순(성별, 지역, 나이, 선호하는 만남, 체형. 키, 성격, 흡연)
 
+    if(listType === 'main' || listType === 'matchList') {
+      let otherLng = myProfile?.meetingOtherResidenceLng;
+      let otherLat = myProfile?.meetingOtherResidenceLat;
+      if (myProfile?.meetingOtherResidence && (!otherLng || !otherLat)) {
+        const otherCord = await MeetingProfileController.getCoordinates(myProfile.meetingOtherResidence);
+        await this.meetingProfileRepository.updateById(myProfile.id, {meetingOtherResidenceLat: otherCord.lat, meetingOtherResidenceLng: otherCord.lng});
+        otherLng = otherCord.lng;
+        otherLat = otherCord.lat;
+      }
+      const querySelect = `SELECT *, (6371*acos(cos(radians(${otherLat}))*cos(radians(meetingResidenceLat))*cos(radians(meetingResidenceLng)-radians(${otherLng}))+sin(radians(${otherLat}))*sin(radians( meetingResidenceLat)))) AS distance ` +
+       `FROM meeting_profile WHERE userId NOT IN (${blockIdsStr}) `;
+      let queryWhere = '';
+      let queryAgeWhere = '';
+      const queryOrder = ` ORDER BY distance ASC LIMIT ${startNum}, ${countPerPage}`;
 
-    const data = {
+      if (myProfile?.meetingOtherSex && myProfile?.meetingOtherSex !== '상관없음') {
+        queryWhere += `AND sex='${myProfile?.meetingOtherSex}' `;
+      }
+
+      if (myProfile?.meetingOtherStartAge && myProfile?.meetingOtherEndAge) {
+        queryAgeWhere = `AND age BETWEEN ${myProfile?.meetingOtherStartAge} AND ${myProfile?.meetingOtherEndAge}`;
+      }
+      let matchListResult = await this.meetingProfileRepository.execute(querySelect + queryWhere + queryAgeWhere + queryOrder);
+
+      if (matchListResult.length === 0 && myProfile?.meetingOtherStartAge && myProfile?.meetingOtherEndAge) {
+        queryAgeWhere = `AND age BETWEEN ${myProfile?.meetingOtherStartAge - 5} AND ${myProfile?.meetingOtherEndAge + 5}`;
+        matchListResult = await this.meetingProfileRepository.execute(querySelect + queryWhere + queryAgeWhere + queryOrder);
+      }
+
+      // matchListResult.sort((a: any, b: any) => {
+      //   return (this.getMeetingMatchCount(myProfile, b) - this.getMeetingMatchCount(myProfile, a));
+      // });
+      matchList = matchListResult.map((v: any) => ({
+        ...v,
+        isOnline: onlineUserIds.indexOf(v.userId) !== -1,
+      }));
+      if (listType === 'matchList') return matchList;
+    }
+
+    return {
       meetingProfile: myProfile,
       popularList,
       nearList,
       matchList,
     };
-    return data;
   }
+
 
   @get('/meetings/request-chat')
   @secured(SecuredType.IS_AUTHENTICATED)
@@ -127,6 +185,7 @@ export class MeetingController {
     @param.query.string('userId') userId: string,
   ) {
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    if (userId === currentUser.userId) throw new HttpErrors.BadRequest('불가능한 요청입니다.');
     const pointSetting = await this.pointSettingRepository.findById(PointSettingType.POINT_MEETING_CHAT);
     const requestFlower = pointSetting.pointSettingAmount;
 
@@ -140,7 +199,7 @@ export class MeetingController {
       where: {
         or: [
           {contactUserId: currentUser.userId, contactOtherUserId: userId, contactServiceType: ServiceType.MEETING},
-          {contactUserId: userId, contactOtherUserId: currentUser.userId, contactServiceType: ServiceType.MEETING}
+          {contactUserId: userId, contactOtherUserId: currentUser.userId, contactServiceType: ServiceType.MEETING},
         ],
       },
     });
@@ -154,19 +213,19 @@ export class MeetingController {
         contactRequestNumber: 0,
       });
     } else {
-      if(chatContactInfo.contactStatus !== ContactStatus.ALLOW && chatContactInfo.contactStatus !== ContactStatus.REQUEST && chatContactInfo.contactRequestNumber < 2) {
+      if (chatContactInfo.contactStatus !== ContactStatus.ALLOW && chatContactInfo.contactStatus !== ContactStatus.REQUEST && chatContactInfo.contactRequestNumber < 2) {
         // 3번이하로 시도했으면
         await this.chatContactRepository.updateById(chatContactInfo.id, {
           contactStatus: ContactStatus.REQUEST,
           contactOtherStatus: ContactStatus.REQUESTED,
-          contactRequestNumber: chatContactInfo.contactRequestNumber + 1
+          contactRequestNumber: chatContactInfo.contactRequestNumber + 1,
         });
       } else {
         throw new HttpErrors.BadRequest('대화신청을 할수 없습니다.');
       }
     }
 
-    if(!hasMeetingPass) {
+    if (!hasMeetingPass) {
       const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, requestFlower);
       await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
       await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
@@ -175,7 +234,7 @@ export class MeetingController {
         flowerValue: v.flowerValue,
         isFreeFlower: v.isFreeFlower,
         flowerHistoryType: FlowerHistoryType.REQUEST_CHAT,
-        flowerHistoryRefer: chatContactInfo?.id
+        flowerHistoryRefer: chatContactInfo?.id,
       })));
     }
     await this.notificationRepository.create({
@@ -191,7 +250,7 @@ export class MeetingController {
       callUserName: myMeetingInfo?.meetingNickname,
       callUserProfile: myMeetingInfo?.meetingPhotoMain,
       contactId: chatContactInfo.id,
-      chatType: ChatType.MEETING_CHAT
+      chatType: ChatType.MEETING_CHAT,
     });
     await this.notificationController.sendPushNotification(userId, myMeetingInfo?.meetingNickname + '님', myMeetingInfo?.meetingNickname + '님이 대화를 신청했어요');
   }

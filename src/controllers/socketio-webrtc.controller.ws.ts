@@ -12,7 +12,7 @@ import {
   UserRepository,
   VerifytokenRepository,
 } from '../repositories';
-import {ChatMsgStatus, ChatMsgType, ChatSocketMsgType, UserType} from '../types';
+import {ChatMsgStatus, ChatMsgType, ChatSocketMsgType, MainSocketMsgType, UserType} from '../types';
 
 const socketUserInfo: {[key: string]: any;} = {};
 
@@ -35,7 +35,10 @@ export class WebrtcControllerWs {
   }
 
   @ws.connect()
-  async connect(socket: Socket) {
+  async connect(
+    socket: Socket,
+    @ws.namespace('main') nspMain: Namespace,
+  ) {
     console.log('webrtc socket connected');
     const jwtTokenHeader = this.socket.client.request.headers.authorization;
     if (jwtTokenHeader && jwtTokenHeader.indexOf('Bearer ') === 0) {
@@ -72,6 +75,16 @@ export class WebrtcControllerWs {
             this.socket.emit(ChatSocketMsgType.SRV_WEBRTC_REJECTED, '');
             this.socket.disconnect();
             return;
+          } else {
+            // 상대방 통화화면 오픈
+            nspMain.to(this.otherUserId).emit(MainSocketMsgType.SRV_OTHER_VOICE_REQ, {
+              chatContactId: this.chatContactId,
+              profile: {
+                profile: this.meInfo.profile,
+                id: this.meInfo.id,
+                nickname: this.meInfo.nickname,
+              },
+            });
           }
         }
         this.socket.join(this.chatContactId);

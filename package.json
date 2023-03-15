@@ -65,6 +65,7 @@
     "dotenv": "^16.0.0",
     "firebase-admin": "^11.3.0",
     "google-auth-library": "^7.14.1",
+    "iap": "^1.1.1",
     "iconv-lite": "^0.6.3",
     "jsonwebtoken": "^8.5.1",
     "loopback-connector-mysql": "^6.1.0",

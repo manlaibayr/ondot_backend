@@ -316,8 +316,8 @@ export class UserController {
       },
       pointSettingInfo,
       availableLearning: true,
-      // availableGift: false,
-      // availableCharge: false,
+      availableGift: true,
+      // availableCharge: true,
     };
   }
 
@@ -555,4 +555,13 @@ export class UserController {
     await this.userRepository.updateById(id, user);
   }
 
+  @get('/users/app-main-info')
+  @secured(SecuredType.IS_AUTHENTICATED)
+  async appMainInfo() {
+    const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
+    const userInfo = await this.userRepository.findById(currentUser.userId);
+    return {
+      showWelcomeSignupPopup: (moment(userInfo.createdAt).add(3, 'days') > moment())
+    }
+  }
 }
