@@ -33,7 +33,7 @@ export class FlowerController {
     const flowerHistory = await this.flowerHistoryRepository.find({where: {flowerUserId: currentUser.userId, isFreeFlower: false}, order: ['createdAt desc']});
     return {
       flower: currentUser.payFlower,
-      history: flowerHistory.map((v) => ({id: v.id, content: v.flowerContent, value: v.flowerValue, createdAt: v.createdAt}))
+      history: flowerHistory.map((v) => ({id: v.id, content: v.flowerContent, value: v.flowerValue, createdAt: v.createdAt})),
     };
 
   }
@@ -54,7 +54,7 @@ export class FlowerController {
       roomTitle: v.roomTitle,
       createdAt: v.createdAt,
       expiredDate: v.roomExpiredDate,
-      isNeedExtent: moment().add(10, 'days') > moment(v.roomExpiredDate)
+      isNeedExtent: moment().add(10, 'days') > moment(v.roomExpiredDate),
     }));
 
     return {
@@ -79,16 +79,25 @@ export class FlowerController {
       this.meetingProfileRepository.findOne({where: {userId: data.otherUserId}, fields: ['id', 'meetingNickname']}),
     ]);
 
-    if (data.flower > currentUser.payFlower) throw new HttpErrors.BadRequest('유료플라워가 충분하지 않습니다.');
-    await Promise.all([
-      this.userRepository.updateById(currentUser.userId, {payFlower: currentUser.payFlower - data.flower}),
-      this.userRepository.updateById(data.otherUserId, {payFlower: otherUserInfo.payFlower + data.flower}),
-      this.flowerHistoryRepository.createAll([
-        {flowerUserId: currentUser.userId, flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함', flowerValue: -data.flower, flowerHistoryType: FlowerHistoryType.GIVE_FLOWER},
-        {flowerUserId: data.otherUserId, flowerContent: userMeetingProfile?.meetingNickname + '님에게서 선물을 받음', flowerValue: data.flower, flowerHistoryType: FlowerHistoryType.RECEIVE_FLOWER},
-      ]),
-    ]);
-    return {payFlower: currentUser.payFlower - data.flower};
+    if (data.flower > (currentUser.payFlower + currentUser.freeFlower)) throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
+    const updateFlowerInfo = Utils.calcUseFlower(currentUser.freeFlower, currentUser.payFlower, data.flower);
+    await this.userRepository.updateById(currentUser.userId, {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower});
+    await this.userRepository.updateById(data.otherUserId, {payFlower: otherUserInfo.freeFlower + data.flower});
+    await this.flowerHistoryRepository.createAll(updateFlowerInfo.history.map((v: any) => ({
+      flowerUserId: currentUser.userId,
+      flowerContent: otherMeetingProfile?.meetingNickname + '님에게 선물함',
+      flowerValue: v.flowerValue,
+      isFreeFlower: v.isFreeFlower,
+      flowerHistoryType: FlowerHistoryType.GIVE_FLOWER,
+    })));
+    await this.flowerHistoryRepository.create({
+      flowerUserId: data.otherUserId,
+      flowerContent: userMeetingProfile?.meetingNickname + '님에게서 선물을 받음',
+      flowerValue: data.flower,
+      isFreeFlower: true,
+      flowerHistoryType: FlowerHistoryType.RECEIVE_FLOWER,
+    });
+    return {payFlower: updateFlowerInfo.updateFlower.payFlower, freeFlower: updateFlowerInfo.updateFlower.freeFlower};
   }
 
   @get('/flowers/pass-purchase')
@@ -98,7 +107,7 @@ export class FlowerController {
   ) {
     const productInfo = await this.storeProductRepository.findById(passId);
     const currentUser: UserCredentials = await this.getCurrentUser() as UserCredentials;
-    if((currentUser.payFlower + currentUser.freeFlower) < productInfo.productFlower) throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
+    if ((currentUser.payFlower + currentUser.freeFlower) < productInfo.productFlower) throw new HttpErrors.BadRequest('플라워가 충분하지 않습니다.');
     // 이미 존재하는 이용권 확인
     const alreadyPassList = await this.usagePassRepository.find({
       where: {passUserId: currentUser.userId, passServiceType: productInfo.productServiceType, passExpireDate: {gte: moment().toDate()}},
@@ -122,7 +131,7 @@ export class FlowerController {
         passName: productInfo.productName,
         passStartDate,
         passExpireDate,
-        passServiceType: productInfo.productServiceType
+        passServiceType: productInfo.productServiceType,
       }),
     ]);
     return {freeFlower: updateFlowerInfo.updateFlower.freeFlower, payFlower: updateFlowerInfo.updateFlower.payFlower};
